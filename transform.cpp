@@ -39,9 +39,26 @@ Image transform()
 {
     Mat cam = Mat::eye(4, 4);
     cam(3, 2) = 1;
+    Mat projection = cam * trans * rot;
     Image result = Image::zeros(ref.size());
+    Mat zbuffer = Mat::ones(result.size()) * 1e8;
+    for (int i=0; i<ref.rows; i++) {
+        for (int j=0; j<ref.cols; j++) {
+            float z = depth(i, j);
+            if (z > 0) {
+                Vector v = convert(Point{j, i}, z, ref.size());
+                std::vector<Vector> tmp = {v};
+                cv::perspectiveTransform(tmp, tmp, projection);
+                Point p = convert(tmp[0], ref.size());
+                if (cv::Rect{Point{0, 0}, result.size()}.contains(p) and zbuffer(p) > tmp[0][2]) {
+                    result(p) = ref(i, j);
+                    zbuffer(p) = tmp[0][2];
+                }
+            }
+        }
+    }
     std::vector<Vector> axes{{0, 0, 0}, {0, 0, 1}, {0, 1, 0}, {1, 0, 0}};
-    cv::perspectiveTransform(axes, axes, cam * trans * rot);
+    cv::perspectiveTransform(axes, axes, projection);
     Point origin{int(axes[0][0]), int(axes[0][1])};
     for (int i=1; i<axes.size(); i++) {
         cv::line(result, convert(axes[0], result.size()), convert(axes[i], result.size()), Vector{float(i==1), float(i==2), float(i==3)});
@@ -80,9 +97,9 @@ static void viewEvent(int event, int x, int y, int flags, void* ptr)
             rot = r * rot;
         } else {
             Mat rx = Mat::eye(4, 4), ry = Mat::eye(4, 4);
-            rx(2, 0) = -(rx(0, 2) = dx);
+            rx(0, 2) = -(rx(2, 0) = dx);
             rx(0, 0) = rx(2, 2) = std::sqrt(1 - pow2(dx));
-            ry(2, 1) = -(ry(1, 2) = dy);
+            ry(1, 2) = -(ry(2, 1) = dy);
             ry(1, 1) = ry(2, 2) = std::sqrt(1 - pow2(dy));
             rot = rx * ry * rot;
         }
@@ -121,8 +138,8 @@ static void drawEvent(int event, int x, int y, int flags, void* ptr)
         } else {
         }
     } else if (pressed) {
-        Mat tmp = depth.clone();
-        cv::ellipse(tmp, cv::RotatedRect{cv::Point2f{start_x, start_y}, cv::Point2f{2.f*std::abs(float(x) - start_x), 2.f*std::abs(float(y) - start_y)}, 0.f}, 1.f);
+        Image tmp = ref.clone();
+        cv::ellipse(tmp, cv::RotatedRect{cv::Point2f{start_x, start_y}, cv::Point2f{2.f*std::abs(float(x) - start_x), 2.f*std::abs(float(y) - start_y)}, 0.f}, cv::Scalar{0.f, 0.f, 1.f});
         cv::imshow("depth", tmp);
     } else if (flags & cv::EVENT_FLAG_ALTKEY) {
     } else {
