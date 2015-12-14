@@ -8,22 +8,31 @@ using Vector = cv::Vec3f;
 using Mat = cv::Mat_<float>;
 using Image = cv::Mat_<Vector>;
 
-const char* winname = "depth";
+const char* winname = "transform";
 
 Image ref;
 Mat rot;
 Mat trans;
+Mat depth;
 
 inline float pow2(float x)
 {
     return x*x;
 }
 
-Point upscale(Vector v, const Image &img)
+Point convert(Vector v, const cv::Size &size)
 {
-    float size = std::min(img.cols, img.rows) / 2.f;
-    Point center{img.cols/2, img.rows/2};
-    return Point{int(v[0] * size), int(v[1] * size)} + center;
+    float scale = std::min(size.width, size.height) / 2.f;
+    Point center{size.width/2, size.height/2};
+    return Point{int(v[0] * scale), int(v[1] * scale)} + center;
+}
+
+Vector convert(Point p, float z, const cv::Size &size)
+{
+    float scale = std::min(size.width, size.height) / 2.f;
+    Point center{size.width/2, size.height/2};
+    p -= center;
+    return Vector{p.x / scale, p.y / scale, z};
 }
 
 Image transform()
@@ -35,7 +44,7 @@ Image transform()
     cv::perspectiveTransform(axes, axes, cam * trans * rot);
     Point origin{int(axes[0][0]), int(axes[0][1])};
     for (int i=1; i<axes.size(); i++) {
-        cv::line(result, upscale(axes[0], result), upscale(axes[i], result), Vector{float(i==1), float(i==2), float(i==3)});
+        cv::line(result, convert(axes[0], result.size()), convert(axes[i], result.size()), Vector{float(i==1), float(i==2), float(i==3)});
     }
     return result;
 }
@@ -46,7 +55,7 @@ void redraw()
     imshow(winname, img);
 }
 
-static void onMouse(int event, int x, int y, int flags, void* ptr)
+static void viewEvent(int event, int x, int y, int flags, void* ptr)
 {
     static bool pressed{false};
     static int prev_x, prev_y;
@@ -83,15 +92,56 @@ static void onMouse(int event, int x, int y, int flags, void* ptr)
     }
 }
 
+static void drawEvent(int event, int x, int y, int flags, void* ptr)
+{
+    static bool pressed{false};
+    static float start_x, start_y;
+	if (event == cv::EVENT_LBUTTONDOWN) {
+        if (flags & cv::EVENT_FLAG_CTRLKEY) {
+            start_x = x;
+            start_y = y;
+            pressed = true;
+        }
+    } else if (event == cv::EVENT_LBUTTONUP) {
+        if (pressed) {
+            int sx = start_x, sy = start_y;
+            int width = std::abs(sx - x), height = std::abs(sy - y);
+            int left = std::max(0, sx - width), top = std::max(0, sy - height), right = std::min(depth.cols - 1, sx + width), bottom = std::min(depth.rows - 1, sy + height);
+            float scale = 2.f * std::min(width, height) / std::min(depth.rows, depth.cols);
+            for (int i=top; i < bottom; i++) {
+                for (int j=left; j < right; j++) {
+                    float radius = pow2(float(sx - j) / width) + pow2(float(sy - i) / height);
+                    if (radius < 1) {
+                        depth(i, j) += scale * std::sqrt(1 - radius);
+                    }
+                }
+            }
+            cv::imshow("depth", depth);
+            pressed = false;
+        } else {
+        }
+    } else if (pressed) {
+        Mat tmp = depth.clone();
+        cv::ellipse(tmp, cv::RotatedRect{cv::Point2f{start_x, start_y}, cv::Point2f{2.f*std::abs(float(x) - start_x), 2.f*std::abs(float(y) - start_y)}, 0.f}, 1.f);
+        cv::imshow("depth", tmp);
+    } else if (flags & cv::EVENT_FLAG_ALTKEY) {
+    } else {
+    }
+}
+
 int main(int argc, char** argv)
 {
     rot = Mat::eye(4, 4);
     trans = Mat::eye(4, 4);
     trans(2, 3) = 2;
     cv::namedWindow(winname, 1);
-    cv::setMouseCallback(winname, onMouse, 0);
-    ref = Image::zeros(300, 400);//cv::imread(argv[1], cv::IMREAD_GRAYSCALE | cv::IMREAD_ANYDEPTH);
-    imshow("original", ref);
+    cv::setMouseCallback(winname, viewEvent, 0);
+    cv::namedWindow("depth");
+    cv::setMouseCallback("depth", drawEvent, 0);
+    cv::imread(argv[1], cv::IMREAD_COLOR | cv::IMREAD_ANYDEPTH).convertTo(ref, CV_32FC3, 1./256);
+    depth = Mat::zeros(ref.size());
+    imshow("ref", ref);
+    imshow("depth", depth);
     redraw();
     while (char(cv::waitKey()) != 27);
     return 0;
