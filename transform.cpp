@@ -8,11 +8,11 @@ using Vector = cv::Vec3f;
 using Mat = cv::Mat_<float>;
 using Image = cv::Mat_<Vector>;
 
-const char* winname = "transform";
+const char *wint = "transform", *winr = "ref", *wind = "depth";
 
 Image ref;
-Mat rot;
-Mat trans;
+Image view;
+Mat cam, rot, trans;
 Mat depth;
 
 inline float pow2(float x)
@@ -35,13 +35,20 @@ Vector convert(Point p, float z, const cv::Size &size)
     return Vector{p.x / scale, p.y / scale, z};
 }
 
+float difference(Vector a, Vector b)
+{
+    return std::abs(a[0] - b[0]) + std::abs(a[1] - b[1]) + std::abs(a[2] - b[2]);
+}
+
 Image transform()
 {
-    Mat cam = Mat::eye(4, 4);
-    cam(3, 2) = 1;
+    static float best_total_error = 1e10;
+    float total_error = 0;
     Mat projection = cam * trans * rot;
-    Image result = Image::zeros(ref.size());
+    Image result = view.clone();
     Mat zbuffer = Mat::ones(result.size()) * 1e8;
+    Mat errmap = Mat::zeros(result.size());
+    cv::Rect screen{Point{0, 0}, result.size()};
     for (int i=0; i<ref.rows; i++) {
         for (int j=0; j<ref.cols; j++) {
             float z = depth(i, j);
@@ -50,12 +57,24 @@ Image transform()
                 std::vector<Vector> tmp = {v};
                 cv::perspectiveTransform(tmp, tmp, projection);
                 Point p = convert(tmp[0], ref.size());
-                if (cv::Rect{Point{0, 0}, result.size()}.contains(p) and zbuffer(p) > tmp[0][2]) {
-                    result(p) = ref(i, j);
-                    zbuffer(p) = tmp[0][2];
+                if (screen.contains(p)) {
+                    float d = difference(result(p), ref(i, j));
+                    errmap(i, j) = d / 3;
+                    total_error += d;
+                    if (zbuffer(p) > tmp[0][2]) {
+                        result(p) = ref(i, j);
+                        zbuffer(p) = tmp[0][2];
+                    }
+                } else {
+                    total_error += 3;
                 }
             }
         }
+    }
+    cv::imshow(wind, errmap);
+    if (total_error > 0 and total_error < best_total_error) {
+        printf("error %f\n", total_error);
+        best_total_error = total_error;
     }
     std::vector<Vector> axes{{0, 0, 0}, {0, 0, 1}, {0, 1, 0}, {1, 0, 0}};
     cv::perspectiveTransform(axes, axes, projection);
@@ -69,26 +88,26 @@ Image transform()
 void redraw()
 {
     Image img = transform();
-    imshow(winname, img);
+    imshow(wint, img);
 }
 
 static void viewEvent(int event, int x, int y, int flags, void* ptr)
 {
     static bool pressed{false};
     static int prev_x, prev_y;
-	if (event == cv::EVENT_LBUTTONDOWN) {
+	if (event == cv::EVENT_LBUTTONUP) {
+        pressed = false;
+    } else if (event == cv::EVENT_LBUTTONDOWN) {
         prev_x = x;
         prev_y = y;
         pressed = true;
-    } else if (event == cv::EVENT_LBUTTONUP) {
-        pressed = false;
     }
     if (pressed) {
         float dx = 2.f * (x - prev_x) / (ref.cols);
         float dy = 2.f * (y - prev_y) / (ref.rows);
         if (flags & cv::EVENT_FLAG_SHIFTKEY) {
-            trans(0, 3) += dx;
-            trans(1, 3) += dy;
+            trans(0, 3) -= dx;
+            trans(1, 3) -= dy;
         } else if (flags & cv::EVENT_FLAG_CTRLKEY) {
             trans(2, 3) += dy;
             Mat r = Mat::eye(4, 4);
@@ -133,14 +152,15 @@ static void drawEvent(int event, int x, int y, int flags, void* ptr)
                     }
                 }
             }
-            cv::imshow("depth", depth);
+            cv::imshow(winr, ref);
+            cv::imshow(wind, depth);
             pressed = false;
         } else {
         }
     } else if (pressed) {
         Image tmp = ref.clone();
         cv::ellipse(tmp, cv::RotatedRect{cv::Point2f{start_x, start_y}, cv::Point2f{2.f*std::abs(float(x) - start_x), 2.f*std::abs(float(y) - start_y)}, 0.f}, cv::Scalar{0.f, 0.f, 1.f});
-        cv::imshow("depth", tmp);
+        cv::imshow(winr, tmp);
     } else if (flags & cv::EVENT_FLAG_ALTKEY) {
     } else {
     }
@@ -148,18 +168,27 @@ static void drawEvent(int event, int x, int y, int flags, void* ptr)
 
 int main(int argc, char** argv)
 {
-    rot = Mat::eye(4, 4);
+    if (argc < 3) {
+        fprintf(stderr, "usage: transform (reference.jpg) (view.jpg)\n");
+        return 1;
+    }
+    cam = Mat::eye(4, 4);
+    cam(3, 2) = 35.f / ((argc > 3) ? atof(argv[3]) : 30.f);
+    rot = -1 * Mat::eye(4, 4);
     trans = Mat::eye(4, 4);
-    trans(2, 3) = 2;
-    cv::namedWindow(winname, 1);
-    cv::setMouseCallback(winname, viewEvent, 0);
-    cv::namedWindow("depth");
-    cv::setMouseCallback("depth", drawEvent, 0);
+    trans(2, 3) = -2;
     cv::imread(argv[1], cv::IMREAD_COLOR | cv::IMREAD_ANYDEPTH).convertTo(ref, CV_32FC3, 1./256);
+    cv::imread(argv[2], cv::IMREAD_COLOR | cv::IMREAD_ANYDEPTH).convertTo(view, CV_32FC3, 1./256);
     depth = Mat::zeros(ref.size());
-    imshow("ref", ref);
-    imshow("depth", depth);
+    
+    cv::namedWindow(winr, 1);
+    cv::setMouseCallback(winr, drawEvent, 0);
+    imshow(winr, ref);
+    cv::namedWindow(wint, 2);
+    cv::setMouseCallback(wint, viewEvent, 0);
     redraw();
+    cv::namedWindow(wind, 3);
+    imshow(wind, depth);
     while (char(cv::waitKey()) != 27);
     return 0;
 }
