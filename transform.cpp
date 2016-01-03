@@ -2,6 +2,7 @@
 #include <vector>
 #include <functional>
 #include <tuple>
+#include <iostream>
 #include "opencv2/imgproc.hpp"
 #include "opencv2/videoio.hpp"
 #include "opencv2/highgui.hpp"
@@ -92,6 +93,15 @@ struct Image : public Bitmap
     }
 };
 
+void my_push_back(Matrix &matrix, const Color &color, float weight=1)
+{
+    static Matrix row = Matrix::ones(1, 4);
+    for (int i=0; i<3; i++) {
+        row(i) = color[i];
+    }
+    matrix.push_back(weight * row);
+}
+
 struct DepthImage : public Image
 {
     Matrix depth;
@@ -113,7 +123,7 @@ struct DepthImage : public Image
         cv::pyrDown(depth, subdepth, subimage.size());
         return DepthImage{subimage, subdepth};
     }
-    float compare(Image view, Matrix projection) const {
+    int compare(Image view, Matrix projection) const {
         const Image &self = *this;
         float sumError = 0, sumWeight = 0;
         std::vector<Vector> w{1};
@@ -128,19 +138,48 @@ struct DepthImage : public Image
         }
         return sumError / float(self.size().area());
     }
+    void collectSamples(Image view, Matrix projection, Matrix &samples, Matrix &results) const {
+        const Image &self = *this;
+        std::vector<Vector> w{1};
+        Vector &v = w.front();
+        
+        for (Point p : Iterrect{self.area}) {
+            v = convert(p);
+            cv::perspectiveTransform(w, w, projection);
+            if (v[2] > 0) {
+                float weight = 1;
+                Color sample = weight * view.sample(v);
+                cv::Vec4f s{sample[0], sample[1], sample[2], weight};
+                samples.push_back(s);
+                //for (int i=0; i<3; i++) {
+                    //samples.push_back(sample[i]);
+                //}
+                //samples.push_back(weight);
+                results.push_back(weight * self(p));
+            }
+        }
+    }
     float pyrCompare(Image view, Matrix projection, int sizeLimit=20) const {
-        const float bias = 1;
-        float score = 1 - compare(view, projection);
-        printf("compare %g : ", score);
+        Matrix samples{0, 1};
+        Matrix results{0, 1};
+        collectSamples(view, projection, samples, results);
         DepthImage img = downscale();
         do {
-            float here = 1 - img.compare(view, projection);
-            printf("%g : ", here);
-            score = (score + bias) * here;
+            img.collectSamples(view, projection, samples, results);
             img = img.downscale();
             view = view.downscale();
         } while (img.rows >= sizeLimit and img.cols >= sizeLimit);
-        return score;
+        samples = samples.reshape(1);
+        results = results.reshape(1);
+        Matrix balance(4, 3);
+        float totalError = 0;
+        for (int i=0; i<3; i++) {
+            Matrix rhs = results.col(i);
+            cv::solve(samples, rhs, balance.col(i), cv::DECOMP_SVD);
+            totalError += cv::norm(samples * balance.col(i) - rhs);
+        }
+        std::cout << balance << std::endl;
+        return -totalError;
     }
 };
 
