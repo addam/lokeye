@@ -12,7 +12,9 @@ using Vector = cv::Vec3f;
 using Bitmap = cv::Mat_<Vector>;
 using Matrix = cv::Mat_<float>;
 
-const char *wint = "transform", *winr = "ref", *wind = "depth";
+cv::Matx33f glob_balance;
+cv::Vec3f glob_brightness;
+bool do_calculate = false;
 
 inline float pow2(float x)
 {
@@ -93,15 +95,6 @@ struct Image : public Bitmap
     }
 };
 
-void my_push_back(Matrix &matrix, const Color &color, float weight=1)
-{
-    static Matrix row = Matrix::ones(1, 4);
-    for (int i=0; i<3; i++) {
-        row(i) = color[i];
-    }
-    matrix.push_back(weight * row);
-}
-
 struct DepthImage : public Image
 {
     Matrix depth;
@@ -131,7 +124,7 @@ struct DepthImage : public Image
         for (Point p : Iterrect{self.area}) {
             v = convert(p);
             cv::perspectiveTransform(w, w, projection);
-            if (v[2] > 0) {
+            if (v[2] < 1e5) {
                 Color sample = view.sample(v);
                 sumError += Color::difference(sample, self(p));
             }
@@ -142,20 +135,17 @@ struct DepthImage : public Image
         const Image &self = *this;
         std::vector<Vector> w{1};
         Vector &v = w.front();
-        
+        assert (samples.rows == results.rows);
         for (Point p : Iterrect{self.area}) {
             v = convert(p);
             cv::perspectiveTransform(w, w, projection);
-            if (v[2] > 0) {
-                float weight = 1;
-                Color sample = weight * view.sample(v);
+            if (v[2] < 1e5) {
+                float weight = 1./size().area();
+                Color sample = weight * self(p);
                 cv::Vec4f s{sample[0], sample[1], sample[2], weight};
                 samples.push_back(s);
-                //for (int i=0; i<3; i++) {
-                    //samples.push_back(sample[i]);
-                //}
-                //samples.push_back(weight);
-                results.push_back(weight * self(p));
+                cv::Vec3f color = weight * view.sample(v);
+                results.push_back(color);
             }
         }
     }
@@ -174,12 +164,14 @@ struct DepthImage : public Image
         Matrix balance(4, 3);
         float totalError = 0;
         for (int i=0; i<3; i++) {
-            Matrix rhs = results.col(i);
-            cv::solve(samples, rhs, balance.col(i), cv::DECOMP_SVD);
-            totalError += cv::norm(samples * balance.col(i) - rhs);
+            cv::solve(samples, results.col(i), balance.col(i), cv::DECOMP_NORMAL);
+            totalError += cv::norm(samples * balance.col(i) - results.col(i), cv::NORM_L1);
         }
-        std::cout << balance << std::endl;
-        return -totalError;
+        balance = balance.t();
+        balance.colRange(0, 3).copyTo(glob_balance);
+        balance.col(3).copyTo(glob_brightness);
+        //std::cout << balance << std::endl;
+        return totalError;
     }
 };
 
@@ -227,29 +219,46 @@ public:
     }
 };
 
-using ProjectionMatrix = std::array<Matrix, 3>;
+struct ProjectionMatrix
+{
+    Matrix cam, rot, trans, invcam;
+    ProjectionMatrix(float fov=30) : cam{Matrix::eye(4, 4)}, rot{Matrix::eye(4, 4)}, trans{Matrix::eye(4, 4)} {
+        float f = 35.f / fov, t = 2;
+        cam(3, 2) = f;
+        cam(2, 3) = t;
+        cam(3, 3) = 1 + f * t;
+        invcam = cam.inv();
+    }
+    operator Matrix() const {
+        return cam * rot * invcam;
+    }
+};
 
 void viewRotate(Window<ProjectionMatrix> &window)
 {
-    assert (window.pressed);
+    if (not window.pressed) {
+        return;
+    }
     cv::Point2f move = window.mouse - window.prev;
     move *= 2.f / std::max(window.size.width, window.size.height);
     if (window.shift) {
-        window.state[2](0, 3) -= move.x;
-        window.state[2](1, 3) -= move.y;
+        Matrix t = Matrix::eye(4, 4);
+        t(0, 3) = move.x;
+        t(1, 3) = move.y;
+        window.state.rot = t * window.state.rot;
     } else if (window.ctrl) {
-        window.state[2](2, 3) += move.y;
         Matrix r = Matrix::eye(4, 4);
+        r(2, 3) = move.y;
         r(1, 0) = -(r(0, 1) = move.x);
         r(0, 0) = r(1, 1) = std::sqrt(1 - pow2(move.y));
-        window.state[1] = r * window.state[1];
+        window.state.rot = r * window.state.rot;
     } else {
         Matrix rx = Matrix::eye(4, 4), ry = Matrix::eye(4, 4);
         rx(0, 2) = -(rx(2, 0) = move.x);
         rx(0, 0) = rx(2, 2) = std::sqrt(1 - pow2(move.x));
         ry(1, 2) = -(ry(2, 1) = move.y);
         ry(1, 1) = ry(2, 2) = std::sqrt(1 - pow2(move.y));
-        window.state[1] = rx * ry * window.state[1];
+        window.state.rot = rx * ry * window.state.rot;
     }
 }
 
@@ -260,32 +269,54 @@ Bitmap render(ImagePair images, Matrix projection)
     Matrix &depth = images.first.depth;
     std::vector<Vector> w{1};
     Vector &v = w.front();
+    Vector vmin, vmax;
+    bool have_any{false};
     for (Point p : Iterrect{images.first.area}) {
         v = images.first.convert(p);
-        if (v[2] == 0) {
+        if (v[2] > 1e3) {
             continue;
+        }
+        if (not have_any) {
+            have_any = true;
+            vmin = vmax = v;
+        } else {
+            for (int i=0; i<3; i++) {
+                std::tie(vmin[i], vmax[i]) = std::minmax({vmin[i], vmax[i], v[i]});
+            }
         }
         cv::perspectiveTransform(w, w, projection);
         Point t = images.second.convert(v);
         if (images.second.area.contains(t) and zbuffer(t) > v[2]) {
-            result(t) = images.first(p);
+            Color c = images.first(p);
+            result(t) = do_calculate ? (glob_balance * c + glob_brightness) : c;
             zbuffer(t) = v[2];
         }
+    }
+    std::vector<Vector> corners{vmin, Vector{vmin[0], vmin[1], vmax[2]}, Vector{vmin[0], vmax[1], vmin[2]}, Vector{vmax[0], vmin[1], vmin[2]}, Vector{vmin[0], vmax[1], vmax[2]}, Vector{vmax[0], vmin[1], vmax[2]}, Vector{vmax[0], vmax[1], vmin[2]}, vmax};
+    std::vector<std::pair<int, int>> edges{{0, 1}, {0, 2}, {0, 3}, {1, 4}, {1, 5}, {2, 4}, {2, 6}, {3, 5}, {3, 6}, {4, 7}, {5, 7}, {6, 7}};
+    cv::perspectiveTransform(corners, corners, projection);
+    for (auto &edge : edges) {
+        Vector &a = corners[edge.first], &b = corners[edge.second];
+        cv::line(result, images.second.convert(a), images.second.convert(b), Color{1, 1, 1});
     }
     return result;
 }
 
+template<bool force=false>
 void viewUpdate(Window<ProjectionMatrix> &window)
 {
-    static float bestScore = 0;
-    if (window.pressed) {
+    static float bestScore = 1e8;
+    if (window.pressed or force) {
         viewRotate(window);
-        Matrix projection = window.state[0] * window.state[2] * window.state[1];
-        window.show(render(window.images, projection));
-        float score = window.images.first.pyrCompare(window.images.second, projection);
-        if (score > bestScore) {
-            bestScore = score;
-            printf("score %g\n", score);
+        window.show(render(window.images, window.state));
+        if (do_calculate) {
+            float score = window.images.first.pyrCompare(window.images.second, window.state);
+            if (score < bestScore) {
+                bestScore = score;
+                printf("error %g\n", score);
+                std::cout << glob_balance << std::endl;
+                std::cout << glob_brightness << std::endl;
+            }
         }
     }
 }
@@ -302,7 +333,7 @@ void depthPaint(Window<int> &window)
             cv::ellipse(tmp, cv::RotatedRect{window.start, shape.size(), 0.f}, 1.f);
             window.show(tmp);
         } else {
-            float scale = std::min(shape.width, shape.height) / float(std::min(window.size.height, window.size.width));
+            float scale = -0.3 * std::min(shape.width, shape.height) / float(std::min(window.size.height, window.size.width));
             Matrix &depth = window.images.first.depth;
             for (Point p : Iterrect{shape}) {
                 Point diff = p - window.start;
@@ -324,15 +355,39 @@ int main(int argc, char** argv)
         return 1;
     }
     ImagePair images{Image::read(argv[1]), Image::read(argv[2])};
+    if (argc > 4) {
+        Matrix depthmap;
+        cv::imread(argv[4], cv::IMREAD_GRAYSCALE | cv::IMREAD_ANYDEPTH).convertTo(depthmap, CV_32FC1, (argc > 5) ? atof(argv[5]) : 1);
+        if (not depthmap.empty()) {
+            images.first.depth = depthmap;
+            printf("loaded depthmap: %ix%i\n", depthmap.rows, depthmap.cols);
+        }
+    }
     Window<int> reference("reference", images, depthPaint);
     reference.show(images.first);
-    Window<ProjectionMatrix> view("view", images, viewUpdate);
-    view.state[0] = Matrix::eye(4, 4);
-    view.state[0](3, 2) = 35.f / ((argc > 3) ? atof(argv[3]) : 30.f);
-    view.state[1] = -1 * Matrix::eye(4, 4);
-    view.state[2] = Matrix::eye(4, 4);
-    view.state[2](2, 3) = -2;
+    Window<ProjectionMatrix> view("view", images, viewUpdate<false>);
+    view.state = ProjectionMatrix((argc > 3) ? atof(argv[3]) : 30.f);
     view.show(images.second);
-    do {} while (char(cv::waitKey()) != 27);
-    return 0;
+    char c;
+    while (1) {
+        switch (char(cv::waitKey())) {
+            static bool h{false};
+            case ' ':
+                do_calculate ^= true;
+                viewUpdate<true>(view);
+                break;
+            case 'd':
+                view.show(images.second);
+                break;
+            case 'h':
+                if (h ^= true) {
+                    reference.show(images.first.depth);
+                } else {
+                    reference.show(images.first);
+                }
+                break;
+            case 27:
+                return 0;
+        }
+    }
 }
