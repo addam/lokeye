@@ -21,6 +21,36 @@ inline float pow2(float x)
     return x*x;
 }
 
+inline float gonflip(float x)
+{
+    return std::sqrt(1 - pow2(x));
+}
+
+inline Vector project(const Vector &v, const Matrix &m)
+{
+    float w = m(3, 3) * 1;
+    for (int i=0; i<3; i++) {
+        w += m(3, i) * v[i];
+    }
+    if (w == 0) {
+        return Vector{0, 0, 0};
+    }
+    Vector result;
+    for (int i=0; i<3; i++) {
+        result[i] = m(i, 3);
+        for (int j=0; j<3; j++) {
+            result[i] += m(i, j) * v[j];
+        }
+        result[i] /= w;
+    }
+    return result;
+}
+
+inline bool valid(Vector v)
+{
+    return v[2] > 0 and v[2] < 1e3;
+}
+
 class Color : public cv::Vec3f
 {
 public:
@@ -104,11 +134,14 @@ struct DepthImage : public Image
     DepthImage(const Image &image, const Matrix &depth) : Image{image}, depth{depth} {
     }
     Vector convert(Point p) const {
-        float z = depth(p);
-        float scale = std::min(area.width, area.height) / 2.f;
+        float z = 1./depth(p);
+        float scale = std::max(area.width, area.height) / 2.f;
         Point center{area.width/2, area.height/2};
         p -= center;
         return Vector{p.x / scale, p.y / scale, z};
+    }
+    bool hasDepth(Point p) const {
+        return depth(p) < 1e5;
     }
     DepthImage downscale() const {
         Image subimage = ((Image)(*this)).downscale();
@@ -119,12 +152,9 @@ struct DepthImage : public Image
     int compare(Image view, Matrix projection) const {
         const Image &self = *this;
         float sumError = 0, sumWeight = 0;
-        std::vector<Vector> w{1};
-        Vector &v = w.front();
         for (Point p : Iterrect{self.area}) {
-            v = convert(p);
-            cv::perspectiveTransform(w, w, projection);
-            if (v[2] < 1e5) {
+            if (hasDepth(p)) {
+                Vector v = project(convert(p), projection);
                 Color sample = view.sample(v);
                 sumError += Color::difference(sample, self(p));
             }
@@ -133,13 +163,10 @@ struct DepthImage : public Image
     }
     void collectSamples(Image view, Matrix projection, Matrix &samples, Matrix &results) const {
         const Image &self = *this;
-        std::vector<Vector> w{1};
-        Vector &v = w.front();
         assert (samples.rows == results.rows);
-        for (Point p : Iterrect{self.area}) {
-            v = convert(p);
-            cv::perspectiveTransform(w, w, projection);
-            if (v[2] < 1e5) {
+        for (Point p : Iterrect{area}) {
+            if (hasDepth(p)) {
+                Vector v = project(convert(p), projection);
                 float weight = 1./size().area();
                 Color sample = weight * self(p);
                 cv::Vec4f s{sample[0], sample[1], sample[2], weight};
@@ -161,10 +188,10 @@ struct DepthImage : public Image
         } while (img.rows >= sizeLimit and img.cols >= sizeLimit);
         samples = samples.reshape(1);
         results = results.reshape(1);
-        Matrix balance(4, 3);
+        Matrix balance = Matrix::eye(4, 3);
         float totalError = 0;
         for (int i=0; i<3; i++) {
-            cv::solve(samples, results.col(i), balance.col(i), cv::DECOMP_NORMAL);
+            cv::solve(samples, results.col(i), balance.col(i), cv::DECOMP_SVD);
             totalError += cv::norm(samples * balance.col(i) - results.col(i), cv::NORM_L1);
         }
         balance = balance.t();
@@ -221,16 +248,19 @@ public:
 
 struct ProjectionMatrix
 {
-    Matrix cam, rot, trans, invcam;
-    ProjectionMatrix(float fov=30) : cam{Matrix::eye(4, 4)}, rot{Matrix::eye(4, 4)}, trans{Matrix::eye(4, 4)} {
-        float f = 35.f / fov, t = 2;
-        cam(3, 2) = f;
-        cam(2, 3) = t;
-        cam(3, 3) = 1 + f * t;
+    Matrix cam, world, invcam;
+    ProjectionMatrix(float fov=30) : cam{Matrix::zeros(4, 4)}, world{Matrix::eye(4, 4)} {
+        cam(0, 0) = 1;
+        cam(1, 1) = 1;
+        cam(2, 3) = 1;
+        cam(3, 2) = 35.f / fov;
         invcam = cam.inv();
     }
+    void apply(const Matrix &transform) {
+        world = transform * world;
+    }
     operator Matrix() const {
-        return cam * rot * invcam;
+        return cam * world * invcam;
     }
 };
 
@@ -245,48 +275,48 @@ void viewRotate(Window<ProjectionMatrix> &window)
         Matrix t = Matrix::eye(4, 4);
         t(0, 3) = move.x;
         t(1, 3) = move.y;
-        window.state.rot = t * window.state.rot;
+        window.state.apply(t);
     } else if (window.ctrl) {
         Matrix r = Matrix::eye(4, 4);
         r(2, 3) = move.y;
         r(1, 0) = -(r(0, 1) = move.x);
-        r(0, 0) = r(1, 1) = std::sqrt(1 - pow2(move.y));
-        window.state.rot = r * window.state.rot;
+        r(0, 0) = r(1, 1) = gonflip(move.x);
+        window.state.apply(r);
     } else {
         Matrix rx = Matrix::eye(4, 4), ry = Matrix::eye(4, 4);
         rx(0, 2) = -(rx(2, 0) = move.x);
-        rx(0, 0) = rx(2, 2) = std::sqrt(1 - pow2(move.x));
+        rx(0, 0) = rx(2, 2) = gonflip(move.x);
         ry(1, 2) = -(ry(2, 1) = move.y);
-        ry(1, 1) = ry(2, 2) = std::sqrt(1 - pow2(move.y));
-        window.state.rot = rx * ry * window.state.rot;
+        ry(1, 1) = ry(2, 2) = gonflip(move.y);
+        window.state.apply(rx * ry);
     }
 }
 
-Bitmap render(ImagePair images, Matrix projection)
+Bitmap render(ImagePair images, ProjectionMatrix trip)//Matrix projection)
 {
+    Matrix projection = trip;
     Bitmap result = images.second.clone();
-    Matrix zbuffer = 1e8 * Matrix::ones(images.second.size());
+    Matrix zbuffer = Matrix::zeros(images.second.size());
     Matrix &depth = images.first.depth;
-    std::vector<Vector> w{1};
-    Vector &v = w.front();
     Vector vmin, vmax;
     bool have_any{false};
     for (Point p : Iterrect{images.first.area}) {
-        v = images.first.convert(p);
-        if (v[2] > 1e3) {
+        if (not images.first.hasDepth(p)) {
             continue;
         }
+        Vector v = images.first.convert(p);
+        Vector vglob = project(v, trip.invcam);
         if (not have_any) {
             have_any = true;
-            vmin = vmax = v;
+            vmin = vmax = vglob;
         } else {
             for (int i=0; i<3; i++) {
-                std::tie(vmin[i], vmax[i]) = std::minmax({vmin[i], vmax[i], v[i]});
+                std::tie(vmin[i], vmax[i]) = std::minmax({vmin[i], vmax[i], vglob[i]});
             }
         }
-        cv::perspectiveTransform(w, w, projection);
+        v = project(v, projection);
         Point t = images.second.convert(v);
-        if (images.second.area.contains(t) and zbuffer(t) > v[2]) {
+        if (images.second.area.contains(t) and zbuffer(t) < v[2]) {
             Color c = images.first(p);
             result(t) = do_calculate ? (glob_balance * c + glob_brightness) : c;
             zbuffer(t) = v[2];
@@ -294,7 +324,12 @@ Bitmap render(ImagePair images, Matrix projection)
     }
     std::vector<Vector> corners{vmin, Vector{vmin[0], vmin[1], vmax[2]}, Vector{vmin[0], vmax[1], vmin[2]}, Vector{vmax[0], vmin[1], vmin[2]}, Vector{vmin[0], vmax[1], vmax[2]}, Vector{vmax[0], vmin[1], vmax[2]}, Vector{vmax[0], vmax[1], vmin[2]}, vmax};
     std::vector<std::pair<int, int>> edges{{0, 1}, {0, 2}, {0, 3}, {1, 4}, {1, 5}, {2, 4}, {2, 6}, {3, 5}, {3, 6}, {4, 7}, {5, 7}, {6, 7}};
-    cv::perspectiveTransform(corners, corners, projection);
+    for (int i=0; i<8; i++) {
+        corners[i] = project(corners[i], trip.cam * trip.world);
+        if (corners[i][2] < 0) {
+            corners[i] = -corners[i];
+        }
+    }
     for (auto &edge : edges) {
         Vector &a = corners[edge.first], &b = corners[edge.second];
         cv::line(result, images.second.convert(a), images.second.convert(b), Color{1, 1, 1});
