@@ -253,7 +253,7 @@ struct ProjectionMatrix
         cam(0, 0) = 1;
         cam(1, 1) = 1;
         cam(2, 3) = 1;
-        cam(3, 2) = 35.f / fov;
+        cam(3, 2) = 35.f / (2 * fov);
         invcam = cam.inv();
     }
     void apply(const Matrix &transform) {
@@ -292,47 +292,23 @@ void viewRotate(Window<ProjectionMatrix> &window)
     }
 }
 
-Bitmap render(ImagePair images, ProjectionMatrix trip)//Matrix projection)
+Bitmap render(ImagePair images, Matrix projection)
 {
-    Matrix projection = trip;
     Bitmap result = images.second.clone();
     Matrix zbuffer = Matrix::zeros(images.second.size());
     Matrix &depth = images.first.depth;
-    Vector vmin, vmax;
     bool have_any{false};
     for (Point p : Iterrect{images.first.area}) {
         if (not images.first.hasDepth(p)) {
             continue;
         }
-        Vector v = images.first.convert(p);
-        Vector vglob = project(v, trip.invcam);
-        if (not have_any) {
-            have_any = true;
-            vmin = vmax = vglob;
-        } else {
-            for (int i=0; i<3; i++) {
-                std::tie(vmin[i], vmax[i]) = std::minmax({vmin[i], vmax[i], vglob[i]});
-            }
-        }
-        v = project(v, projection);
+        Vector v = project(images.first.convert(p), projection);
         Point t = images.second.convert(v);
         if (images.second.area.contains(t) and zbuffer(t) < v[2]) {
             Color c = images.first(p);
             result(t) = do_calculate ? (glob_balance * c + glob_brightness) : c;
             zbuffer(t) = v[2];
         }
-    }
-    std::vector<Vector> corners{vmin, Vector{vmin[0], vmin[1], vmax[2]}, Vector{vmin[0], vmax[1], vmin[2]}, Vector{vmax[0], vmin[1], vmin[2]}, Vector{vmin[0], vmax[1], vmax[2]}, Vector{vmax[0], vmin[1], vmax[2]}, Vector{vmax[0], vmax[1], vmin[2]}, vmax};
-    std::vector<std::pair<int, int>> edges{{0, 1}, {0, 2}, {0, 3}, {1, 4}, {1, 5}, {2, 4}, {2, 6}, {3, 5}, {3, 6}, {4, 7}, {5, 7}, {6, 7}};
-    for (int i=0; i<8; i++) {
-        corners[i] = project(corners[i], trip.cam * trip.world);
-        if (corners[i][2] < 0) {
-            corners[i] = -corners[i];
-        }
-    }
-    for (auto &edge : edges) {
-        Vector &a = corners[edge.first], &b = corners[edge.second];
-        cv::line(result, images.second.convert(a), images.second.convert(b), Color{1, 1, 1});
     }
     return result;
 }
@@ -406,13 +382,17 @@ int main(int argc, char** argv)
     char c;
     while (1) {
         switch (char(cv::waitKey())) {
-            static bool h{false};
+            static bool h{false}, d{false};
             case ' ':
                 do_calculate ^= true;
                 viewUpdate<true>(view);
                 break;
             case 'd':
-                view.show(images.second);
+                if (d ^= true) {
+                    view.show(images.second);
+                } else {
+                    view.show(render(images, view.state));
+                }
                 break;
             case 'h':
                 if (h ^= true) {
