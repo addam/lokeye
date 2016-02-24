@@ -20,3 +20,7 @@ Mám podezření, že velké problémy bude dělat osvětlení.
 
 Vymodeloval jsem svoji hlavu z referenčních fotek a pomocí motion trackingu v Blenderu.
 Doladění pozice hlavy se teď ručně dá udělat docela přesné, až na rozdíly výrazu ve tváři.
+
+Vysvětlil jsem počítači, jak určit gradient chybové funkce podle šesti parametrů shodného zobrazení.
+Napsal jsem kód, který hledá lokální minimum chybové funkce metodou největšího spádu se setrvačností.
+Do určité míry to dovede hlavu umístit, ale není to (zatím?) dost dobré.
