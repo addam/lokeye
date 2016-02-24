@@ -20,6 +20,8 @@ cv::Matx33f glob_balance;
 cv::Vec3f glob_brightness;
 bool do_calculate = false;
 
+const int paramCount = 6;
+
 inline float pow2(float x)
 {
     return x*x;
@@ -297,49 +299,61 @@ struct DepthImage : public Image
         return diff;
         #endif
     }
-    Matf<6, 1> d_compare(const Image &view, const Matrix &Q, const Matrix d_Q_tr[6]) const
+    Matf<paramCount, 1> d_compare(const Image &view, const Matrix &Q, const Matrix d_Q_tr[paramCount]) const
     {
-        Matf<6, 1> d_E_tr = Matf<6, 1>::zeros(); // result
+        auto d_E_tr = Matf<paramCount, 1>::zeros(); // result
         const DepthImage &ref = *this;
         Mat_<Matf<3, 2>> d_view = sobel(view);
+        int sampleCount = 0;
         for (Point x : Iterrect{area}) {
-            Vector z3 = ref.convert(x);
-            Vec4 z = homogenize(z3);
-            Vec4 w = project4(z3, Q);
-            Vector w3 = dehomogenize(w);
-            Point p = view.convert(w3);
-            Matf<3, 2> d_view_p = d_view(p);
-            Matf<1, 2> d_E_p = psiprime(view(p) - ref(x)).t() * d_view_p;
-            Matf<2, 4> d_p_w = {
-                1 / w[3], 0, 0, -w[0] / pow2(w[3]),
-                0, 1 / w[3], 0, -w[1] / pow2(w[3])};
-            for (int k=0; k<6; k++) {
-                Matf<1, 1> scalar = d_E_p * d_p_w * project4(z3, d_Q_tr[k]);
-                d_E_tr(k) += scalar(0);
+            if (hasDepth(x)) {
+                Vector z3 = ref.convert(x);
+                Vec4 z = homogenize(z3);
+                Vec4 w = project4(z3, Q);
+                Vector w3 = dehomogenize(w);
+                Point p = view.convert(w3);
+                Matf<3, 2> d_view_p = area.contains(p) ? d_view(p) : Matf<3, 2>::zeros();
+                Matf<1, 2> d_E_p = psiprime(view(p) - ref(x)).t() * d_view_p;
+                Matf<2, 4> d_p_w = {
+                    1 / w[3], 0, 0, -w[0] / pow2(w[3]),
+                    0, 1 / w[3], 0, -w[1] / pow2(w[3])};
+                for (int k=0; k<paramCount; k++) {
+                    Matf<1, 1> scalar = d_E_p * d_p_w * project4(z3, d_Q_tr[k]);
+                    d_E_tr(k) += scalar(0);
+                }
+                sampleCount += 1;
             }
         }
-        return d_E_tr * (1000 / area.area());
+        auto result = d_E_tr * ((sampleCount > 0) ? 1.0f / sampleCount : 0);
+        //std::cout << "result = " << result.t() << std::endl;
+        return result;
     }
-    Matf<6, 1> d_pyrCompare(Image view, ProjectionMatrix projection, int sizeLimit=20) const {
+    Matf<paramCount, 1> d_pyrCompare(Image view, ProjectionMatrix projection, int sizeLimit=20) const {
         const Matrix &cam = projection.cam;
         const Matrix invcam = projection.world * projection.invcam;
         const Matrix Q = projection;
+        // the derivatives of Q wrt. the six Euclidean transformations
         const Matrix d_Q_tr[] = {
             cam.col(1) * invcam.row(2) - cam.col(2) * invcam.row(1),
             cam.col(0) * invcam.row(2) - cam.col(2) * invcam.row(0),
             cam.col(0) * invcam.row(1) - cam.col(1) * invcam.row(0),
             cam.col(0) * invcam.row(3),
             cam.col(1) * invcam.row(3),
-            cam.col(2) * invcam.row(3)
+            cam.col(2) * invcam.row(3),
+            cam.col(0) * invcam.row(0),
+            cam.col(1) * invcam.row(1),
+            cam.col(2) * invcam.row(2)
         };
-        Matf<6, 1> result = d_compare(view, Q, d_Q_tr);
+        Matf<paramCount, 1> result = d_compare(view, Q, d_Q_tr);
         DepthImage ref = downscale();
-        while (false and ref.rows >= sizeLimit and ref.cols >= sizeLimit) {
+        int layerCount = 0;
+        while (ref.rows >= sizeLimit and ref.cols >= sizeLimit) {
             view = view.downscale();
             result += ref.d_compare(view, Q, d_Q_tr);
+            layerCount += 1;
             ref = ref.downscale();
         }
-        return result;
+        return result * (1.f / layerCount);
     }
 };
 
@@ -387,26 +401,49 @@ public:
     }
 };
 
-Matrix parseEulerian(Matf<6, 1> params)
+Matrix parseEuclidean(Matf<6, 1> params)
 {
-    printf("start parse\n");
     using cv::SVD;
-    float rot_x = params(0), rot_y = params(1), rot_z = params(2);
+    using std::sin;
+    using std::cos;
+    float rot_x = -params(0), rot_y = -params(1), rot_z = -params(2);
     float move_x = params(3), move_y = params(4), move_z = params(5);
     Matrix result{4, 4};
-    Matrix rotation = result.colRange(0, 3).rowRange(0, 3);
-    Matrix translation = result.col(3).rowRange(0, 3);
-    Matrix homogeneous = result.row(3);
-    rotation = (cv::Mat_<float>{3, 3} <<
-        gonflip(rot_x) + gonflip(rot_z), -rot_z, -rot_x,
-        rot_z, gonflip(rot_y) + gonflip(rot_z), -rot_y,
-        rot_x, rot_y, gonflip(rot_x) + gonflip(rot_y));
+    Matrix init_rotation = (cv::Mat_<float>{3, 3} <<
+        1, -rot_z, -rot_y,
+        rot_z, 1, -rot_x,
+        rot_y, rot_x, 1);
+    SVD svd{init_rotation, SVD::MODIFY_A};
+    Matrix rotation = svd.u * svd.vt;
+    rotation.copyTo(result.colRange(0, 3).rowRange(0, 3));
+    Matrix translation = (cv::Mat_<float>{3, 1} << move_x, move_y, move_z);
+    translation.copyTo(result.col(3).rowRange(0, 3));
+    Matrix homogeneous = (cv::Mat_<float>{1, 4} << 0, 0, 0, 1);
+    homogeneous.copyTo(result.row(3));
+    return result;
+}
+
+Matrix parseEuclidean(Matf<9, 1> params)
+{
+    using cv::SVD;
+    using std::sin;
+    using std::cos;
+    float sin_x = params(0), sin_y = params(1), sin_z = params(2);
+    float move_x = params(3), move_y = params(4), move_z = params(5);
+    float diag_x = params(6), diag_y = params(7), diag_z = params(8);
+    Matrix result{4, 4};
+    Matrix rotation = (cv::Mat_<float>{3, 3} <<
+        1 + diag_x, -sin_z, -sin_y,
+        sin_z, 1 + diag_y, -sin_x,
+        sin_y, sin_x, 1 + diag_z);
     SVD svd{rotation, SVD::MODIFY_A};
     rotation = svd.u * svd.vt;
-    translation = (cv::Mat_<float>{3, 1} << move_x, move_y, move_z);
-    homogeneous = (cv::Mat_<float>{1, 4} << 0, 0, 0, 1);
-    printf("parsed:\n");
-    std::cout << result << std::endl;
+    rotation.copyTo(result.colRange(0, 3).rowRange(0, 3));
+    Matrix translation = (cv::Mat_<float>{3, 1} << move_x, move_y, move_z);
+    translation.copyTo(result.col(3).rowRange(0, 3));
+    Matrix homogeneous = (cv::Mat_<float>{1, 4} << 0, 0, 0, 1);
+    homogeneous.copyTo(result.row(3));
+    std::cout << "transformation = " << result << std::endl;
     return result;
 }
 
@@ -417,25 +454,18 @@ void viewRotate(Window<ProjectionMatrix> &window)
     }
     cv::Point2f move = window.mouse - window.prev;
     move *= 2.f / std::max(window.size.width, window.size.height);
+    auto params = Matf<6, 1>::zeros();
     if (window.shift) {
-        Matrix t = Matrix::eye(4, 4);
-        t(0, 3) = move.x;
-        t(1, 3) = move.y;
-        window.state.apply(t);
+        params(3) = move.x;
+        params(4) = move.y;
     } else if (window.ctrl) {
-        Matrix r = Matrix::eye(4, 4);
-        r(2, 3) = move.y;
-        r(1, 0) = -(r(0, 1) = move.x);
-        r(0, 0) = r(1, 1) = gonflip(move.x);
-        window.state.apply(r);
+        params(2) = move.x;
+        params(5) = move.y;
     } else {
-        Matrix rx = Matrix::eye(4, 4), ry = Matrix::eye(4, 4);
-        rx(0, 2) = -(rx(2, 0) = move.x);
-        rx(0, 0) = rx(2, 2) = gonflip(move.x);
-        ry(1, 2) = -(ry(2, 1) = move.y);
-        ry(1, 1) = ry(2, 2) = gonflip(move.y);
-        window.state.apply(rx * ry);
+        params(1) = move.x;
+        params(0) = move.y;
     }
+    window.state.apply(parseEuclidean(params));
 }
 
 Bitmap render(ImagePair images, Matrix projection)
@@ -474,7 +504,7 @@ void viewUpdate(Window<ProjectionMatrix> &window)
                 //std::cout << glob_balance << std::endl;
                 //std::cout << glob_brightness << std::endl;
                 printf("suggested next step (rot x, y, z, translate x, y, z):\n");
-                std::cout << window.images.first.d_pyrCompare(window.images.second, window.state) << std::endl;
+                std::cout << window.images.first.d_pyrCompare(window.images.second, window.state).t() << std::endl;
             }
         }
     }
@@ -522,12 +552,15 @@ int main(int argc, char** argv)
             printf("loaded depthmap: %ix%i\n", depthmap.rows, depthmap.cols);
         }
     }
+    images.first = images.first.downscale();
+    images.second = images.second.downscale();
     Window<int> reference("reference", images, depthPaint);
     reference.show(images.first);
     Window<ProjectionMatrix> view("view", images, viewUpdate<false>);
     view.state = ProjectionMatrix((argc > 3) ? atof(argv[3]) : 30.f);
     view.show(images.second);
     char c;
+    auto momentum = Matf<paramCount, 1>::zeros();
     while (1) {
         switch (char(cv::waitKey())) {
             static bool h{false}, d{false};
@@ -548,9 +581,16 @@ int main(int argc, char** argv)
                     reference.show(images.first);
                 } break;
             case 's': {
-                auto step = images.first.d_pyrCompare(images.second, view.state);
-                auto transformation = parseEulerian(step);
-                view.state.apply(transformation);
+                for (int i=0; i<5; i++) {
+                    auto step = images.first.d_pyrCompare(images.second, view.state);
+                    momentum = 0.8 * momentum - 0.2 * step;
+                    //std::cout << "params = " << step.t() << std::endl;
+                    Matrix transformation = parseEuclidean(momentum);
+                    view.state.apply(transformation);
+                }
+                float score = images.first.pyrCompare(images.second, view.state);
+                printf("score: %g\n", score);
+                viewUpdate<true>(view);
                 } break;
             case 27:
                 return 0;
