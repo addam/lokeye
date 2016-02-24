@@ -8,9 +8,13 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/video.hpp"
 using cv::Point;
-using Vector = cv::Vec3f;
+using Vec2 = cv::Vec2f;
+using Vec3 = cv::Vec3f;
+using Vec4 = cv::Vec4f;
+using Vector = Vec3;
 using Bitmap = cv::Mat_<Vector>;
 using Matrix = cv::Mat_<float>;
+template<int n, int m> using Matf = cv::Matx<float, n, m>;
 
 cv::Matx33f glob_balance;
 cv::Vec3f glob_brightness;
@@ -26,7 +30,27 @@ inline float gonflip(float x)
     return std::sqrt(1 - pow2(x));
 }
 
-inline Vector project(const Vector &v, const Matrix &m)
+inline Vec2 project2(const Vector &v, const Matrix &m)
+{
+    float w = m(3, 3) * 1;
+    for (int i=0; i<3; i++) {
+        w += m(3, i) * v[i];
+    }
+    if (w == 0) {
+        return Vec2{0, 0};
+    }
+    Vec2 result;
+    for (int i=0; i<2; i++) {
+        result[i] = m(i, 3);
+        for (int j=0; j<3; j++) {
+            result[i] += m(i, j) * v[j];
+        }
+        result[i] /= w;
+    }
+    return result;
+}
+
+inline Vector project3(const Vector &v, const Matrix &m)
 {
     float w = m(3, 3) * 1;
     for (int i=0; i<3; i++) {
@@ -46,10 +70,51 @@ inline Vector project(const Vector &v, const Matrix &m)
     return result;
 }
 
+Vec4 project4(const Vector &v, const Matrix &m)
+{
+    Vec4 result;
+    for (int i=0; i<4; i++) {
+        result[i] = m(i, 3);
+        for (int j=0; j<3; j++) {
+            result[i] += m(i, j) * v[j];
+        }
+    }
+    return result;    
+}
+
+inline Vec4 homogenize(const Vector &v)
+{
+    return Vec4{v[0], v[1], v[2], 1};
+}
+
+inline Vector dehomogenize(const Vec4 &v)
+{
+    const float c = 1./v[3];
+    return Vector{v[0]*c, v[1]*c, v[2]*c};
+}
+
 inline bool valid(Vector v)
 {
     return v[2] > 0 and v[2] < 1e3;
 }
+
+struct ProjectionMatrix
+{
+    Matrix cam, world, invcam;
+    ProjectionMatrix(float fov=30) : cam{Matrix::zeros(4, 4)}, world{Matrix::eye(4, 4)} {
+        cam(0, 0) = 1;
+        cam(1, 1) = 1;
+        cam(2, 3) = 1;
+        cam(3, 2) = 35.f / (2 * fov);
+        invcam = cam.inv();
+    }
+    void apply(const Matrix &transform) {
+        world = transform * world;
+    }
+    operator Matrix() const {
+        return cam * world * invcam;
+    }
+};
 
 class Color : public cv::Vec3f
 {
@@ -96,6 +161,28 @@ struct Iterrect : public cv::Rect {
         return Iterator{{tl().x, br().y}, br().x};
     }
 };
+
+cv::Mat_<Matf<3, 2>> sobel(Bitmap img)
+{
+    Bitmap partial[2];
+    cv::Sobel(img, partial[0], -1, 1, 0, 3);
+    cv::Sobel(img, partial[1], -1, 0, 1, 3);
+    cv::Mat_<Matf<3, 2>> result{partial[0].size()};
+    cv::merge(partial, 2, result);
+    const int rows = std::min(partial[0].rows, partial[1].rows), cols = std::min(partial[0].cols, partial[1].cols);
+    for (int i=0; i<rows; i++) {
+        for (int j=0; j<cols; j++) {
+            Matf<3, 2> &d_view_p = result(i, j);
+            for (int s=0; s<3; s++) {
+                for (int t=0; t<2; t++) {
+                    Vec3 colors = partial[t](i, j);
+                    d_view_p(s, t) = colors(s);
+                }
+            }
+        }
+    }
+    return result;
+}
 
 struct Image : public Bitmap
 {
@@ -154,7 +241,7 @@ struct DepthImage : public Image
         float sumError = 0, sumWeight = 0;
         for (Point p : Iterrect{self.area}) {
             if (hasDepth(p)) {
-                Vector v = project(convert(p), projection);
+                Vector v = project3(convert(p), projection);
                 Color sample = view.sample(v);
                 sumError += Color::difference(sample, self(p));
             }
@@ -166,7 +253,7 @@ struct DepthImage : public Image
         assert (samples.rows == results.rows);
         for (Point p : Iterrect{area}) {
             if (hasDepth(p)) {
-                Vector v = project(convert(p), projection);
+                Vector v = project3(convert(p), projection);
                 float weight = 1./size().area();
                 Color sample = weight * self(p);
                 cv::Vec4f s{sample[0], sample[1], sample[2], weight};
@@ -180,25 +267,79 @@ struct DepthImage : public Image
         Matrix samples{0, 1};
         Matrix results{0, 1};
         collectSamples(view, projection, samples, results);
-        DepthImage img = downscale();
-        do {
-            img.collectSamples(view, projection, samples, results);
-            img = img.downscale();
+        DepthImage ref = downscale();
+        while (false and ref.rows >= sizeLimit and ref.cols >= sizeLimit) {
             view = view.downscale();
-        } while (img.rows >= sizeLimit and img.cols >= sizeLimit);
+            ref.collectSamples(view, projection, samples, results);
+            ref = ref.downscale();
+        }
         samples = samples.reshape(1);
         results = results.reshape(1);
         Matrix balance = Matrix::eye(4, 3);
         float totalError = 0;
         for (int i=0; i<3; i++) {
-            cv::solve(samples, results.col(i), balance.col(i), cv::DECOMP_SVD);
-            totalError += cv::norm(samples * balance.col(i) - results.col(i), cv::NORM_L1);
+            //cv::solve(samples, results.col(i), balance.col(i), cv::DECOMP_SVD);
+            totalError += cv::norm(samples * balance.col(i) - results.col(i), cv::NORM_L2);
         }
         balance = balance.t();
         balance.colRange(0, 3).copyTo(glob_balance);
         balance.col(3).copyTo(glob_brightness);
         //std::cout << balance << std::endl;
         return totalError;
+    }
+    static Matf<3, 1> psiprime(Matf<3, 1> diff)
+    {
+        #ifdef PSI_ABSVALUE
+        const float epsilon = 1e-4;
+        float norm = std::sqrt(pow2(diff(0)) + pow2(diff(3)) + pow2(diff(3)) + epsilon);
+        return diff * (1 / norm);
+        #else
+        return diff;
+        #endif
+    }
+    Matf<6, 1> d_compare(const Image &view, const Matrix &Q, const Matrix d_Q_tr[6]) const
+    {
+        Matf<6, 1> d_E_tr = Matf<6, 1>::zeros(); // result
+        const DepthImage &ref = *this;
+        Mat_<Matf<3, 2>> d_view = sobel(view);
+        for (Point x : Iterrect{area}) {
+            Vector z3 = ref.convert(x);
+            Vec4 z = homogenize(z3);
+            Vec4 w = project4(z3, Q);
+            Vector w3 = dehomogenize(w);
+            Point p = view.convert(w3);
+            Matf<3, 2> d_view_p = d_view(p);
+            Matf<1, 2> d_E_p = psiprime(view(p) - ref(x)).t() * d_view_p;
+            Matf<2, 4> d_p_w = {
+                1 / w[3], 0, 0, -w[0] / pow2(w[3]),
+                0, 1 / w[3], 0, -w[1] / pow2(w[3])};
+            for (int k=0; k<6; k++) {
+                Matf<1, 1> scalar = d_E_p * d_p_w * project4(z3, d_Q_tr[k]);
+                d_E_tr(k) += scalar(0);
+            }
+        }
+        return d_E_tr * (1000 / area.area());
+    }
+    Matf<6, 1> d_pyrCompare(Image view, ProjectionMatrix projection, int sizeLimit=20) const {
+        const Matrix &cam = projection.cam;
+        const Matrix invcam = projection.world * projection.invcam;
+        const Matrix Q = projection;
+        const Matrix d_Q_tr[] = {
+            cam.col(1) * invcam.row(2) - cam.col(2) * invcam.row(1),
+            cam.col(0) * invcam.row(2) - cam.col(2) * invcam.row(0),
+            cam.col(0) * invcam.row(1) - cam.col(1) * invcam.row(0),
+            cam.col(0) * invcam.row(3),
+            cam.col(1) * invcam.row(3),
+            cam.col(2) * invcam.row(3)
+        };
+        Matf<6, 1> result = d_compare(view, Q, d_Q_tr);
+        DepthImage ref = downscale();
+        while (false and ref.rows >= sizeLimit and ref.cols >= sizeLimit) {
+            view = view.downscale();
+            result += ref.d_compare(view, Q, d_Q_tr);
+            ref = ref.downscale();
+        }
+        return result;
     }
 };
 
@@ -246,23 +387,28 @@ public:
     }
 };
 
-struct ProjectionMatrix
+Matrix parseEulerian(Matf<6, 1> params)
 {
-    Matrix cam, world, invcam;
-    ProjectionMatrix(float fov=30) : cam{Matrix::zeros(4, 4)}, world{Matrix::eye(4, 4)} {
-        cam(0, 0) = 1;
-        cam(1, 1) = 1;
-        cam(2, 3) = 1;
-        cam(3, 2) = 35.f / (2 * fov);
-        invcam = cam.inv();
-    }
-    void apply(const Matrix &transform) {
-        world = transform * world;
-    }
-    operator Matrix() const {
-        return cam * world * invcam;
-    }
-};
+    printf("start parse\n");
+    using cv::SVD;
+    float rot_x = params(0), rot_y = params(1), rot_z = params(2);
+    float move_x = params(3), move_y = params(4), move_z = params(5);
+    Matrix result{4, 4};
+    Matrix rotation = result.colRange(0, 3).rowRange(0, 3);
+    Matrix translation = result.col(3).rowRange(0, 3);
+    Matrix homogeneous = result.row(3);
+    rotation = (cv::Mat_<float>{3, 3} <<
+        gonflip(rot_x) + gonflip(rot_z), -rot_z, -rot_x,
+        rot_z, gonflip(rot_y) + gonflip(rot_z), -rot_y,
+        rot_x, rot_y, gonflip(rot_x) + gonflip(rot_y));
+    SVD svd{rotation, SVD::MODIFY_A};
+    rotation = svd.u * svd.vt;
+    translation = (cv::Mat_<float>{3, 1} << move_x, move_y, move_z);
+    homogeneous = (cv::Mat_<float>{1, 4} << 0, 0, 0, 1);
+    printf("parsed:\n");
+    std::cout << result << std::endl;
+    return result;
+}
 
 void viewRotate(Window<ProjectionMatrix> &window)
 {
@@ -302,7 +448,7 @@ Bitmap render(ImagePair images, Matrix projection)
         if (not images.first.hasDepth(p)) {
             continue;
         }
-        Vector v = project(images.first.convert(p), projection);
+        Vector v = project3(images.first.convert(p), projection);
         Point t = images.second.convert(v);
         if (images.second.area.contains(t) and zbuffer(t) < v[2]) {
             Color c = images.first(p);
@@ -325,8 +471,10 @@ void viewUpdate(Window<ProjectionMatrix> &window)
             if (score < bestScore) {
                 bestScore = score;
                 printf("error %g\n", score);
-                std::cout << glob_balance << std::endl;
-                std::cout << glob_brightness << std::endl;
+                //std::cout << glob_balance << std::endl;
+                //std::cout << glob_brightness << std::endl;
+                printf("suggested next step (rot x, y, z, translate x, y, z):\n");
+                std::cout << window.images.first.d_pyrCompare(window.images.second, window.state) << std::endl;
             }
         }
     }
@@ -392,15 +540,18 @@ int main(int argc, char** argv)
                     view.show(images.second);
                 } else {
                     view.show(render(images, view.state));
-                }
-                break;
+                } break;
             case 'h':
                 if (h ^= true) {
                     reference.show(images.first.depth);
                 } else {
                     reference.show(images.first);
-                }
-                break;
+                } break;
+            case 's': {
+                auto step = images.first.d_pyrCompare(images.second, view.state);
+                auto transformation = parseEulerian(step);
+                view.state.apply(transformation);
+                } break;
             case 27:
                 return 0;
         }
