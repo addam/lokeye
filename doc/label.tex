@@ -1,0 +1,27 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[czech]{babel}
+\begin{document}
+\section*{Documentation of label.cpp}
+
+The file is a development sandbox for estimating direction of eye gaze.
+Currently, it can only find iris-like circles around an area selected by the user.
+Its user interface is designed for labeling the iris position in many images, so it may feel quite weird for other purposes.
+
+\subsection*{Formulation}
+
+As long as the person is looking at something quite close to the camera, both the pupils and the irises will be imaged as circles.
+Furthemore, they will be dark circles on bright background.
+A good fitness function can be therefore formulated as average gradient magnitude along the boundary of a given circle.
+
+In order for the fitness function to be smooth, the circle needs to be anti-aliased.
+That is achieved by assigning each pixel a weight $w \in [0, 1]$ that corresponds to its distance from the circle boundary.
+Pixels exactly on the boundary will be assigned $w = 1$; most of the image will be weighted as $w = 0$ and, in fact, not considered at all.
+
+\subsection*{Update step}
+
+The program performs a simple gradient descent algorithm on the circle position and radius.
+Each step size is limited to one pixel at most, so that no important features are skipped.
+
+\end{document}
+
