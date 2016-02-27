@@ -102,7 +102,7 @@ inline bool valid(Vector v)
 
 struct ProjectionMatrix
 {
-    Matrix cam, world, invcam;
+    Matrix cam, world, invcam, memory;
     ProjectionMatrix(float fov=30) : cam{Matrix::zeros(4, 4)}, world{Matrix::eye(4, 4)} {
         cam(0, 0) = 1;
         cam(1, 1) = 1;
@@ -111,7 +111,11 @@ struct ProjectionMatrix
         invcam = cam.inv();
     }
     void apply(const Matrix &transform) {
+        memory = world.clone();
         world = transform * world;
+    }
+    void revert() {
+        world = memory;
     }
     operator Matrix() const {
         return cam * world * invcam;
@@ -561,6 +565,7 @@ int main(int argc, char** argv)
     view.show(images.second);
     char c;
     auto momentum = Matf<paramCount, 1>::zeros();
+    float score = 1e10;
     while (1) {
         switch (char(cv::waitKey())) {
             static bool h{false}, d{false};
@@ -584,11 +589,19 @@ int main(int argc, char** argv)
                 for (int i=0; i<5; i++) {
                     auto step = images.first.d_pyrCompare(images.second, view.state);
                     momentum = 0.8 * momentum - 0.2 * step;
-                    //std::cout << "params = " << step.t() << std::endl;
                     Matrix transformation = parseEuclidean(momentum);
                     view.state.apply(transformation);
+                    float newScore = images.first.pyrCompare(images.second, view.state);
+                    if (newScore > score) {
+                        printf("reset (%g > %g) ", newScore, score);
+                        momentum = -0.1 * step;
+                        view.state.revert();
+                        transformation = parseEuclidean(momentum);
+                        view.state.apply(transformation);
+                    }
+                    //std::cout << "params = " << step.t() << std::endl;
                 }
-                float score = images.first.pyrCompare(images.second, view.state);
+                score = images.first.pyrCompare(images.second, view.state);
                 printf("score: %g\n", score);
                 viewUpdate<true>(view);
                 } break;
