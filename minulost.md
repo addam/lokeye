@@ -29,29 +29,42 @@ Do určité míry to dovede hlavu umístit, ale není to (zatím?) dost dobré.
 
 Přečetl jsem články:
 
-### Balasubramanian, Vineeth Nallure, Jieping Ye, and Sethuraman Panchanathan. "Biased manifold embedding: A framework for person-independent head pose estimation." Computer Vision and Pattern Recognition, 2007. CVPR'07. IEEE Conference on. IEEE, 2007.
+### Biased manifold embedding: A framework for person-independent head pose estimation
+  _Balasubramanian, Vineeth Nallure, Jieping Ye, and Sethuraman Panchanathan in IEEE CVPR 2007._
   Autoři navrhují docela jednoduchý způsob, jak upravit některé fitovací algoritmy, aby z nich šlo později získat přesná čísla -- v tomto případě úhel natočení hlavy. Jestli použiju nějaký podobný přístup, měl bych si článek ještě přečíst jednou pečlivěji.
   
-### Fanelli, Gabriele, Juergen Gall, and Luc Van Gool. "Real time head pose estimation with random regression forests." Computer Vision and Pattern Recognition (CVPR), 2011 IEEE Conference on. IEEE, 2011.
+### Real time head pose estimation with random regression forests
+  _Fanelli, Gabriele, Juergen Gall, and Luc Van Gool in IEEE CVPR 2011._
   Článek se zabývá zpracováním dat z hloubkové kamery (jako je Kinect), a navíc získané rozlišení úhlů je asi deset stupňů, takže je docela nezajímavý. Chytré mi přijde generování trénovacích dat pomocí 3D modelu hlavy, takže je úhel bezchybně známý. 3D model pochází z práce [Paysan, Knothe, Amberg, Romdhani, Vetter: A 3d face model for pose and illumination invariant face recognition]
 
-### Ba, Sileye O., and Jean-Marc Odobez. "A probabilistic framework for joint head tracking and pose estimation." Pattern Recognition, 2004. ICPR 2004. Proceedings of the 17th International Conference on. Vol. 4. IEEE, 2004.
+### A probabilistic framework for joint head tracking and pose estimation
+  _Ba, Sileye O., and Jean-Marc Odobez in IEEE ICPR 2004._
   Cílem autorů je, aby jediný algoritmus odhadoval ve videu všech šest stupňů volnosti hlavy -- což mi připadá docela samozřejmé. Navrhovaný přístup vypadá spíš jako výpočet náhodným střílením a hrubou silou zabalený do pár pravděpodobnostních vzorečků. Nevím, jakého úhlového rozlišení dovede ten výpočet dosáhnout, ale ukázkové výpočty v článku rozlišují do přihrádek po 22,5 stupních a to naprosto nestačí.
 
-### Murphy-Chutorian, Erik, Anup Doshi, and Mohan Manubhai Trivedi. "Head pose estimation for driver assistance systems: A robust algorithm and experimental evaluation." Intelligent Transportation Systems Conference, 2007. ITSC 2007. IEEE. IEEE, 2007.
+### Head pose estimation for driver assistance systems: A robust algorithm and experimental evaluation
+  _Murphy-Chutorian, Erik, Anup Doshi, and Mohan Manubhai Trivedi in IEEE ITSC 2007._
   Osvědčený přístup: histogram orientovaných gradientů a support vector machine. Hezká je péče o poctivá testovací data: pozici hlavy měřili v autě za jízdy soupravou několika kamer průmyslově vyrobených pro ten účel, a to ve dne i v noci. Za zmínku stojí taky, že noční výsledky jsou lepší -- díky IR přísvitu. Výpočet dosahuje chyby asi 5---10 stupňů.
 
-### Gourier, Nicolas, et al. "Head pose estimation on low resolution images." Multimodal Technologies for Perception of Humans. Springer Berlin Heidelberg, 2006. 270-280.
+### Head pose estimation on low resolution images
+  _Gourier, Nicolas, et al. in Multimodal Technologies for Perception of Humans. Springer Berlin Heidelberg, 2006. 270-280._
   Používají přímo auto-asociativní neuronové sítě; vstup je zmenšený a oříznutý tak, aby obsahoval jen hlavu a měl 24x30 pixelů. Každá síť odpovídá jednomu konkrétnímu úhlu, takže rozlišení není pro nás zajímavé. Hezké je srovnání se schopností lidí rozpoznávat natočení hlavy: podle všeho je podobně chabé jako schopnosti tohoto algoritmu, totiž s chybou asi 10 stupňů. Autoři krom toho navrhují použít dva nezávislé výpočty pro úhel ve dvou osách, protože jen mírně uškodí výsledku a výrazně zrychlí výpočet (počet potřebných autoasociativních sítí se zmenší odmocninou).
 
-### PENG, LAWYAN. "HEAD POSE ESTIMATION." Universiti Teknologi Malaysia, 2013.
+### Head Pose Estimation
+  _PENG, LAWYAN. Universiti Teknologi Malaysia, 2013._
   Disertace shrnující dosavadní poznatky o trasování hlavy. Pravdivá, ale špatná, navíc obrázky jsou vykradené z následujícího článku.
   
-### Murphy-Chutorian, Erik, and Mohan Manubhai Trivedi. "Head pose estimation in computer vision: A survey." Pattern Analysis and Machine Intelligence, IEEE Transactions on 31.4 (2009): 607-626.
+### Head pose estimation in computer vision: A survey
+  _Murphy-Chutorian, Erik, and Mohan Manubhai Trivedi in IEEE Pattern Analysis and Machine Intelligence 31.4 (2009): 607-626._
   Pečlivý rozbor možných přístupů k rozpoznávání natočení hlavy. Zvlášť mě inspiruje skupina Manifold Embedding, algoritmus Adaptive Appearance Model a hybridní modely. Nečetl jsem všechny podrobnosti, ale zjevně jde celkově o vydatně probádanou oblast. Užitečné jsou reference na algoritmy a testovací databáze.
 
-### Raytchev, Bisser, Ikushi Yoda, and Katsuhiko Sakaue. "Head pose estimation by nonlinear manifold learning." Pattern Recognition, 2004. ICPR 2004. Proceedings of the 17th International Conference on. Vol. 4. IEEE, 2004.
-  Velmi slibný přístup v případě, že je k dispozici dost trénovacích dat z různých úhlů. Bohužel se ten článek vyžívá ve stroze podané maticové aritmetice, takže jen zhruba chápu, co se děje. Základem je algoritmus Isomap -- nad trénovacími daty se vybuduje graf sousednosti a ten se pak deformuje, aby šel proložit jednoduchou funkcí. (Přečtu si původní článek o Isomap, snad bude přístupnější.)
-
-### Srinivasan, Sujith, and Kim L. Boyer. "Head pose estimation using view based eigenspaces." null. IEEE, 2002.
+### Head pose estimation using view based eigenspaces
+  _Srinivasan, Sujith, and Kim L. Boyer in IEEE ?, 2002._
   Sympaticky jednoduché řešení založené na PCA zmenšených obrázků. Vstupní obrázek se pak promítne postupně do eigenspace každého trénovacího kandidáta. Namísto přímého vyčtení úhlů z kandidáta s nejlepší shodou navrhují autoři krok s využitím hloubkové mapy, který nechápu. Výsledky opravují Kalmanovým filtrem.
+
+### Head pose estimation by nonlinear manifold learning
+  _Raytchev, Bisser, Ikushi Yoda, and Katsuhiko Sakaue in IEEE ICPR 2004._
+  Pěkný přístup pro případ, že je k dispozici dost trénovacích dat z různých úhlů. Bohužel se ten článek vyžívá ve stroze podané maticové aritmetice, takže jen matně chápu, co se děje. Základem je algoritmus Isomap, popsaný v následujícím článku; rozšíření zřejmě umožňuje přesně vyhodnotit parametry pro libovolná vstupní data.
+
+### A global geometric framework for nonlinear dimensionality reduction
+  _Tenenbaum, Joshua B., Vin De Silva, and John C. Langford in science 290.5500 (2000): 2319-2323._
+  Původní článek o široce používaném algoritmu Isomap. Trénovacím datům stanovíme euklidovskou metriku -- potřebujeme tedy mít data označená smysluplnými parametry. Pak vybudujeme graf namátkovým spojováním blízkých bodů hranou a ten graf se pokusíme deformovat do prostoru menší dimenze tak, aby se vzdálenosti zachovaly. Pro moje použití to ale postrádá smysl, protože data tvoří v prostoru parametrů docela kompaktní oblast (kompaktní v lidském smyslu).
