@@ -5,15 +5,76 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <array>
 
-using cv::Vec2f;
-using cv::Vec3f;
-using cv::Matx23f;
-using cv::Matx32f;
-using cv::Mat_;
-using Rectf = cv::Rect_<float>;
+using Pixel = cv::Point;
+using Vector2 = cv::Vec2f;
+using Vector3 = cv::Vec3f;
+using Matrix22 = cv::Matx22f;
+using Matrix23 = cv::Matx23f;
+using Matrix32 = cv::Matx32f;
 using cv::VideoCapture;
+using cv::Rect;
 
-using Bitmap = Mat_<Vec3f>;
+using Color = Vector3;
+using Bitmap1 = cv::Mat_<float>;
+using Bitmap3 = cv::Mat_<Color>;
+
+inline Pixel to_pixel(Vector2 v)
+{
+    return Pixel{int(v[0]), int(v[1])};
+}
+
+inline Vector2 to_vector(Pixel p)
+{
+    return Vector2{float(p.x), float(p.y)};
+}
+
+inline float pow2(float x)
+{
+    return x*x;
+}
+
+struct Iterrect : public Rect {
+    Iterrect(const Rect &rect) : Rect{rect} {
+    }
+    Iterrect(Bitmap3 bm) : Rect{0, 0, bm.cols, bm.rows} {
+    }
+    Iterrect operator & (const Iterrect &other) const {
+        return Iterrect((*this) & other);
+    }
+    struct Iterator : public Pixel {
+        int left, right;
+        Iterator(const Pixel &p, int right) : Pixel{p}, left{p.x}, right{right} {
+        }
+        Pixel& operator *() {
+            return *this;
+        }
+        bool operator != (const Iterator &other) const {
+            return y != other.y or x != other.x;
+        }
+        Iterator& operator++() {
+            if (++x >= right) {
+                x = left;
+                y ++;
+            }
+            return *this;
+        }
+    };
+    Iterator begin() const {
+        return Iterator{tl(), br().x};
+    }
+    Iterator end() const {
+        return Iterator{{tl().x, br().y}, br().x};
+    }
+    template<typename Func, typename T>
+    T max(Func f, T init) const {
+        const Pixel corners[] = {{x, y}, {x+width, y}, {x, y+height}, {x+width, y+height}};
+        for (Pixel p : corners) {
+            T val = f(p);
+            init = std::max(init, val);
+        }
+        return init;
+    }
+};
 
 struct Image
 {
@@ -25,53 +86,66 @@ struct Image
         YX = 3,
         YY = 4
     };
-    Bitmap data;
-    std::array<Bitmap, 5> derivatives;
+    Bitmap3 data;
+    std::array<Bitmap3, 5> derivatives;
     void read(VideoCapture &cap);
-    Vec3f operator () (Vec2f) const;
-    Matx32f grad(Vec2f);
-    Vec3f d(Order, Vec2f);
+    Iterrect region() const;
+    Color operator () (Pixel) const;
+    Color operator () (Vector2 v) const { return (*this)(to_pixel(v)); }
+    Matrix32 grad(Vector2);
+    Color d(Order, Vector2);
+    Color d(Order o, Pixel p) { return this->d(o, to_vector(p)); }
+    Bitmap3& d(Order);
 };
 
 struct Transformation
 {
-    using Params = Vec3f;
+    using Params = Vector3;
     Params params;
-    Vec2f operator () (Vec2f pos) const;
-    Vec2f inverse(Vec2f pos) const;
-    Params dx(Vec2f pos) const;
-    Params dy(Vec2f pos) const;
-    Matx23f grad(Vec2f pos) const;
+    Vector2 operator () (Vector2) const;
+    Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
+    Vector2 inverse(Vector2) const;
+    Params dx(Vector2) const;
+    Params dy(Vector2) const;
+    Matrix23 grad(Vector2) const;
+    Matrix23 grad(Pixel p) const { return this->grad(to_vector(p)); }
 };
 
 struct Mask
 {
-    Mat_<float> data;
-    float operator () (Vec2f) const;
-    Vec2f grad(Vec2f) const;
+    Pixel offset;
+    Bitmap1 data;
+    Mask(cv::Rect region) : offset{region.x, region.y}, data{region.height, region.width} {}
+    /// @todo implement!
+    float operator () (Vector2) const {return 1;}
+    Vector2 grad(Vector2) const {return Vector2{0, 0};}
 };
 
 struct Eye
 {
-    Vec2f pos;
+    Vector2 pos;
     float radius;
-    void refit(const Image&, const Transformation&);
+    void refit(Image&, const Transformation&);
+protected:
+    float sum_boundary_dp(const Bitmap3 &img_x, const Bitmap3 &img_y, const Transformation&);
+    float sum_boundary_dr(Image&, const Transformation&);
+    Iterrect region(const Transformation&) const;
 };
 
 struct Face
 {
-    Rectf region;
+    Iterrect region;
     std::array<Eye, 2> eyes;
+    Image &ref;
     Transformation tsf;
-    void refit(const Image &img, const Image &ref);
+    Mask mask;
+    Face(Image &ref, cv::Rect region, Eye left_eye, Eye right_eye) : ref{ref}, region{region}, eyes{left_eye, right_eye}, mask{region} {
+        /// @todo initialize mask
+    }
+    void refit(Image&);
     void render(const Image&);
 };
 
-Face mark_eyes(const Image&);
-
-inline cv::Point round(Vec2f vec)
-{
-    return cv::Point(vec[0], vec[1]);
-}
+Face mark_eyes(Image&);
 
 #endif // MAIN_H

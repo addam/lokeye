@@ -1,73 +1,77 @@
 #include "main.h"
+using Image::Order::XX;
+using Image::Order::XY;
+using Image::Order::YY;
 
-void Face::refit(const Image &img, const Image &ref)
+void Face::refit(Image &img)
 {
     for (int iteration=0; iteration < 10; iteration++) {
-        decltype(tsf.params) grad;
-        for (unsigned i=0; i<img.data.rows; i++) {
-            for (unsigned j=0; j<img.data.cols; j++) {
-                Vec2f pixel = {float(j), float(i)};
-                Vec3f diff = ref(tsf(pixel)) - img(pixel);
-                grad += diff.dot(diff) * mask.grad(tsf(pixel)) * tsf.grad(pixel) + mask(tsf(pixel)) * 2 * diff.t() * ref.grad(tsf(pixel)) * tsf.grad(pixel);
-            }
+        cv::Matx<float, 3, 1> grad;
+        for (Pixel p : region) {
+            Color diff = ref(tsf(p)) - img(p);
+            grad += (diff.dot(diff) * mask.grad(tsf(p)).t() * tsf.grad(p) + mask(tsf(p)) * 2 * diff.t() * ref.grad(tsf(p)) * tsf.grad(p)).t();
         }
-        length = max(region.corners, [](Vec2f corner) { return (tsf.grad(corner) * grad).norm(); });
-        tsf.params -= grad / length;
+        float length = region.max([this, grad](Pixel corner) { return cv::norm(tsf.grad(corner) * grad); }, 1e-5);
+        tsf.params -= (1/length) * grad;
     }
     for (Eye &eye : eyes) {
         eye.refit(img, tsf);
     }
 }
 
-void Eye::refit(const Image &img)
+void Eye::refit(Image &img, const Transformation &tsf)
 {
     for (int iteration=0; iteration < 100; iteration++) {
-        Vec2f delta_pos = {sum_boundary(img.d(XX), img.d(XY)), sum_boundary(img.d(XY), img.d(YY))};
-        float delta_radius = dr(img);
+        Vector2 delta_pos = {sum_boundary_dp(img.d(XX), img.d(XY), tsf), sum_boundary_dp(img.d(XY), img.d(YY), tsf)};
+        float delta_radius = sum_boundary_dr(img, tsf);
         float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1]), std::abs(delta_radius)});
         pos += step * delta_pos;
         radius += step * delta_radius;
     }
 }
 
-Vec3f Eye::sum_boundary(const cv::Mat &img_x, const cv::Mat &img_y)
+float Eye::sum_boundary_dp(const Bitmap3 &img_x, const Bitmap3 &img_y, const Transformation &tsf)
 {
-    const int
-        top = MAX(c.y - c.r, 0),
-        bottom = MIN(c.y + c.r + 2, img_x.rows),
-        left = MAX(c.x - c.r, 0),
-        right = MIN(c.x + c.r + 2, img_x.cols);
+    Vector2 center = tsf(pos);
+    /// @todo use derivative of tsf wrt. x, y
+    float scale = 1;
     float result = 0;
     float sum_weight = 0;
-    for (int row = top; row < bottom; row++) {
-        const float
-            *g_row = img_x.ptr<float>(row),
-            *h_row = img_y.ptr<float>(row);
-        for (int col = left; col < right; col++) {
-            float dist_x = col - c.x;
-            float dist_y = row - c.y;
-            float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - c.r);
-            if (w > 0) {
-                result += w * (g_row[col] * dist_x + h_row[col] * dist_y) / c.r;
-                sum_weight += w;
-            }
+    for (Pixel p : region(tsf) & Iterrect(img_x) & Iterrect(img_y)) {
+        float dist_x = (p.x - center[0]) / scale;
+        float dist_y = (p.y - center[0]) / scale;
+        float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - radius);
+        if (w > 0) {
+            result += w * cv::norm(img_x(p) * dist_x + img_y(p) * dist_y) / radius;
+            sum_weight += w;
         }
     }
     return result / sum_weight;
 }
 
-Vec3f Eye::sum_boundary_dr(const Image &img)
+float Eye::sum_boundary_dr(Image &img, const Transformation &tsf)
 {
+    Vector2 center = tsf(pos);
+    /// @todo use derivative of tsf wrt. x, y
+    float scale = 1;
     float result = 0;
     float sum_weight = 0;
-    for (Vec2f pixel : region.crop(img)) {
-        float dist_x = pixel.x - pos.x;
-        float dist_y = pixel.y - pos.y;
+    for (Pixel p : region(tsf) & img.region()) {
+        float dist_x = (p.x - center[0]) / scale;
+        float dist_y = (p.y - center[0]) / scale;
         float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - radius);
         if (w > 0) {
-            result += w * (img.d(XX, pixel) * pow2(dist_x) + 2 * img.d(XY, pixel) * dist_x * dist_y + img.d(YY, pixel) * pow2(dist_y * dist_y)) / pow2(c.r);
+            result += w * cv::norm(img.d(XX, p) * pow2(dist_x) + 2 * img.d(XY, p) * dist_x * dist_y + img.d(YY, p) * pow2(dist_y * dist_y)) / pow2(radius);
             sum_weight += w;
         }
     }
     return result / sum_weight;
+}
+
+Iterrect Eye::region(const Transformation &tsf) const
+{
+    Vector2 center = tsf(pos);
+    /// @todo use derivative of tsf wrt. x, y
+    float scale = 1;
+    return Rect(center[0] - radius * scale, center[1] - radius * scale, 2 * radius * scale + 2, 2 * radius * scale + 2);
 }

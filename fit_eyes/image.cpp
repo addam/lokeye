@@ -1,10 +1,10 @@
 #include "main.h"
 
-void sobel(Bitmap src, Bitmap dst, int dx, int dy)
+void sobel(Bitmap3 src, Bitmap3 dst, int dx, int dy)
 {
     const int ksize = 3;
     const int type = CV_32FC1;
-    cv::Mat tmp[3];
+    Bitmap1 tmp[3];
     cv::split(src, tmp);
     for (int i=0; i<3; i++) {
         cv::Sobel(tmp[i], tmp[i], type, dx, dy, ksize, 1.0 / (1 << (2 * ksize - 3)));
@@ -19,32 +19,42 @@ void Image::read(VideoCapture &cap)
     tmp.convertTo(data, CV_32FC1, 1./255);
 }
 
-Vec3f Image::operator () (Vec2f pos) const {
-    /// @todo subsample
-    return data(round(pos));
+Iterrect Image::region() const
+{
+    return Iterrect(data);
 }
 
-Matx32f Image::grad(Vec2f pos)
+Color Image::operator () (Pixel p) const {
+    /// @todo subsample
+    return data(p);
+}
+
+Matrix32 Image::grad(Vector2 v)
 {
     /// @todo subsample
-    Matx32f result;
+    Matrix32 result;
     for (int i=0; i<2; i++) {
         if (derivatives[i].empty()) {
             sobel(data, derivatives[i], i==0, i==1);
         }
-        result.col(i) = derivatives[i](round(pos));
+        result.col(i) = derivatives[i](to_pixel(v));
     }
     return result;
 }
 
-Vec3f Image::d(Order order, Vec2f pos)
+Bitmap3& Image::d(Order order)
 {
-    /// @todo subsample
     size_t index = static_cast<size_t>(order);
     if (derivatives[index].empty()) {
         const int dx[] = {1, 0, 2, 1, 0};
         const int dy[] = {0, 1, 0, 1, 2};
         sobel(data, derivatives[index], dx[index], dy[index]);
     }
-    return derivatives[index](round(pos));
+    return derivatives[index];
+}
+
+Color Image::d(Order order, Vector2 v)
+{
+    /// @todo subsample
+    return d(order)(to_pixel(v));
 }
