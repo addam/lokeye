@@ -68,3 +68,18 @@ Face mark_eyes(Image &img)
     Face result{img, Rect{state.begin, state.end}, state.eyes[0], state.eyes[1]};
     return result;
 }
+
+void Face::render(const Image &image) const {
+    const char winname[] = "fit";
+    Bitmap3 result = image.data.clone();
+    cv::RotatedRect shape{tsf(Vector2(region.x + 0.5 * region.width, region.y + 0.5 * region.height)), cv::Size2f(region.width, region.height), 180 * tsf.params[2] / float(M_PI)};
+    cv::Point2f vertices[4];
+    shape.points(vertices);
+    for (int i = 0; i < 4; i++) {
+        cv::line(result, vertices[i], vertices[(i+1)%4], cv::Scalar(0, 1.0, 1.0));
+    }
+    for (const Eye &eye : eyes) {
+        cv::circle(result, to_pixel(tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+    }
+    cv::imshow(winname, result);
+}

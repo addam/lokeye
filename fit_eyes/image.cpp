@@ -12,11 +12,14 @@ void sobel(Bitmap3 src, Bitmap3 dst, int dx, int dy)
     cv::merge(tmp, 3, dst);
 }
 
-void Image::read(VideoCapture &cap)
+bool Image::read(VideoCapture &cap)
 {
     cv::Mat tmp;
-    cap.read(tmp);
-    tmp.convertTo(data, CV_32FC1, 1./255);
+    bool result = cap.read(tmp);
+    if (result) {
+        tmp.convertTo(data, CV_32FC1, 1./255);
+    }
+    return result;
 }
 
 Iterrect Image::region() const

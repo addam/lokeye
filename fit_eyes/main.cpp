@@ -6,13 +6,11 @@ int main(int argc, char** argv)
     VideoCapture cam = (argc > 1) ? VideoCapture{argv[1]} : VideoCapture{0};
     reference_image.read(cam);
     Face state = mark_eyes(reference_image);
-    #if 0
-    while (cap.good()) {
-        Image image;
-        image.read(cam);
-        state.refit(image, reference_image);
-        imshow(state.render(image));
+    Image image;
+    while (char(cv::waitKey(20)) != 27 and image.read(cam)) {
+        state.refit(image);
+        state.render(image);
+        printf("done\n");
     }
-    #endif
     return 0;
 }

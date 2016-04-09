@@ -1,15 +1,15 @@
 #include "main.h"
-using Image::Order::XX;
-using Image::Order::XY;
-using Image::Order::YY;
+using D = Image::Order;
 
 void Face::refit(Image &img)
 {
     for (int iteration=0; iteration < 10; iteration++) {
         cv::Matx<float, 3, 1> grad;
+        printf("calculate grad\n");
         for (Pixel p : region) {
+            fprintf(stderr, ".");
             Color diff = ref(tsf(p)) - img(p);
-            grad += (diff.dot(diff) * mask.grad(tsf(p)).t() * tsf.grad(p) + mask(tsf(p)) * 2 * diff.t() * ref.grad(tsf(p)) * tsf.grad(p)).t();
+            grad += diff.dot(diff) * (mask.grad(tsf(p)).t() * tsf.grad(p) + mask(tsf(p)) * 2 * diff.t() * ref.grad(tsf(p)) * tsf.grad(p)).t();
         }
         float length = region.max([this, grad](Pixel corner) { return cv::norm(tsf.grad(corner) * grad); }, 1e-5);
         tsf.params -= (1/length) * grad;
@@ -21,8 +21,10 @@ void Face::refit(Image &img)
 
 void Eye::refit(Image &img, const Transformation &tsf)
 {
-    for (int iteration=0; iteration < 100; iteration++) {
-        Vector2 delta_pos = {sum_boundary_dp(img.d(XX), img.d(XY), tsf), sum_boundary_dp(img.d(XY), img.d(YY), tsf)};
+    for (int iteration=0; iteration < 10; iteration++) {
+        printf("calculate delta_pos\n");
+        Vector2 delta_pos = {sum_boundary_dp(img.d(D::XX), img.d(D::XY), tsf), sum_boundary_dp(img.d(D::XY), img.d(D::YY), tsf)};
+        printf("calculate delta_radius\n");
         float delta_radius = sum_boundary_dr(img, tsf);
         float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1]), std::abs(delta_radius)});
         pos += step * delta_pos;
@@ -61,7 +63,7 @@ float Eye::sum_boundary_dr(Image &img, const Transformation &tsf)
         float dist_y = (p.y - center[0]) / scale;
         float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - radius);
         if (w > 0) {
-            result += w * cv::norm(img.d(XX, p) * pow2(dist_x) + 2 * img.d(XY, p) * dist_x * dist_y + img.d(YY, p) * pow2(dist_y * dist_y)) / pow2(radius);
+            result += w * cv::norm(img.d(D::XX, p) * pow2(dist_x) + 2 * img.d(D::XY, p) * dist_x * dist_y + img.d(D::YY, p) * pow2(dist_y * dist_y)) / pow2(radius);
             sum_weight += w;
         }
     }

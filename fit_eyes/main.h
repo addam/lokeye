@@ -1,5 +1,6 @@
 #ifndef MAIN_H
 #define MAIN_H
+#define WITH_OPENMP
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -88,7 +89,7 @@ struct Image
     };
     Bitmap3 data;
     std::array<Bitmap3, 5> derivatives;
-    void read(VideoCapture &cap);
+    bool read(VideoCapture &cap);
     Iterrect region() const;
     Color operator () (Pixel) const;
     Color operator () (Vector2 v) const { return (*this)(to_pixel(v)); }
@@ -143,7 +144,7 @@ struct Face
         /// @todo initialize mask
     }
     void refit(Image&);
-    void render(const Image&);
+    void render(const Image&) const;
 };
 
 Face mark_eyes(Image&);
