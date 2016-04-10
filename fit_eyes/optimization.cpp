@@ -3,16 +3,27 @@ using D = Image::Order;
 
 void Face::refit(Image &img)
 {
+    const char winname[] = "sopel";
     for (int iteration=0; iteration < 10; iteration++) {
-        cv::Matx<float, 3, 1> grad;
-        printf("calculate grad\n");
+        cv::Matx<float, 3, 1> grad = {0, 0, 0};
+        Matrix32 tsf_grad = tsf.grad(Vector2(0, 0)).t();
+        auto rotregion = Rect(to_pixel(tsf(Vector2(region.x, region.y))), region.size());
+        Bitmap3 &sob = ref.d(D::X);
+        printf("sobel X size: %i, %i; rotregion %i, %i; %i, %i\n", sob.cols, sob.rows, rotregion.x, rotregion.y, rotregion.width, rotregion.height);
+        cv::imshow(winname, sob(region));
+        cv::waitKey();
         for (Pixel p : region) {
-            fprintf(stderr, ".");
             Color diff = ref(tsf(p)) - img(p);
-            grad += diff.dot(diff) * (mask.grad(tsf(p)).t() * tsf.grad(p) + mask(tsf(p)) * 2 * diff.t() * ref.grad(tsf(p)) * tsf.grad(p)).t();
+            Matrix32 ref_grad = ref.grad(tsf(p));
+            cv::Matx<float, 2, 1> tmp = (mask.grad(tsf(p)).t() + mask(tsf(p)) * 2 * diff.t() * ref_grad).t();
+            //printf("(%g, %g, %g) * (%g, %g; %g, %g; %g, %g) = (%g; %g)\n", diff[0], diff[1], diff[2], ref_grad(0, 0), ref_grad(0, 1), ref_grad(0, 2), ref_grad(1, 0), ref_grad(1, 1), ref_grad(1, 2), tmp(0), tmp(1));
+            grad += diff.dot(diff) * tsf_grad * tmp;
+            //printf(" += (%g, %g, %g)^2 * (%g, %g; %g, %g; %g, %g) * (%g; %g)\n", diff[0], diff[1], diff[2], tsf_grad(0, 0), tsf_grad(0, 1), tsf_grad(1, 0), tsf_grad(1, 1), tsf_grad(2, 0), tsf_grad(2, 1), tmp(0, 0), tmp(1, 0));
         }
         float length = region.max([this, grad](Pixel corner) { return cv::norm(tsf.grad(corner) * grad); }, 1e-5);
+        printf("step (%g, %g, %g) / %g\n", grad(0), grad(1), grad(2), length);
         tsf.params -= (1/length) * grad;
+        exit(14);
     }
     for (Eye &eye : eyes) {
         eye.refit(img, tsf);
@@ -22,9 +33,7 @@ void Face::refit(Image &img)
 void Eye::refit(Image &img, const Transformation &tsf)
 {
     for (int iteration=0; iteration < 10; iteration++) {
-        printf("calculate delta_pos\n");
         Vector2 delta_pos = {sum_boundary_dp(img.d(D::XX), img.d(D::XY), tsf), sum_boundary_dp(img.d(D::XY), img.d(D::YY), tsf)};
-        printf("calculate delta_radius\n");
         float delta_radius = sum_boundary_dr(img, tsf);
         float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1]), std::abs(delta_radius)});
         pos += step * delta_pos;
