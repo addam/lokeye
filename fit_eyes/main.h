@@ -37,10 +37,10 @@ inline float pow2(float x)
 struct Iterrect : public Rect {
     Iterrect(const Rect &rect) : Rect{rect} {
     }
-    Iterrect(Bitmap3 bm) : Rect{0, 0, bm.cols, bm.rows} {
+    Iterrect(const Bitmap3 &bm) : Rect{0, 0, bm.cols, bm.rows} {
     }
     Iterrect operator & (const Iterrect &other) const {
-        return Iterrect((*this) & other);
+        return Iterrect(static_cast<const Rect&>(*this) & static_cast<const Rect&>(other));
     }
     struct Iterator : public Pixel {
         int left, right;

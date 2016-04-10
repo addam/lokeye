@@ -14,20 +14,27 @@ const char* cvtoa(int type)
     return "unknown type";
 }
 
+template<int N, int M>
+void copyToCol(const Vector3 &v, cv::Matx<float, N, M> &m, int column)
+{
+    // I hate you for having to do this, OpenCV.
+    for (int i=0; i<N; i++) {
+        m(i, column) = v[i];
+    }
+}
+
 void sobel(const Bitmap3 &src, Bitmap3 &dst, int dx, int dy)
 {
-    printf("sobel\n");
-    const int ksize = 3;
+    const int ksize = 7;
     const int type = CV_32FC1;
     Bitmap1 tmp[3];
-    double min = 0, max = 0;
     cv::split(src, tmp);
     for (int i=0; i<3; i++) {
         cv::Sobel(tmp[i], tmp[i], type, dx, dy, ksize, 1.0 / (1 << (2 * ksize - 3)));
+        double min = 0, max = 0;
         cv::minMaxIdx(tmp[i], &min, &max);
         printf("min %g, max %g\n", min, max);
     }
-    dst = Bitmap3(src.size());
     cv::merge(tmp, 3, dst);
 }
 
@@ -55,8 +62,9 @@ Color Image::operator () (Pixel p) const {
 Matrix32 Image::grad(Vector2 v)
 {
     Matrix32 result;
-    result.col(0) = d(Order::X, v);
-    result.col(1) = d(Order::Y, v);
+    copyToCol(d(Order::X, v), result, 0);
+    copyToCol(d(Order::Y, v), result, 1);
+    assert (result(0, 0) == d(Order::X, v)(0));
     return result;
 }
 

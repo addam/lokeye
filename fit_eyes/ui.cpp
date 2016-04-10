@@ -17,6 +17,9 @@ struct State
         cv::setMouseCallback(winname, onMouse, this);
         cv::imshow(winname, canvas);
     }
+    ~State() {
+        cv::destroyWindow(winname);
+    }
     void render() const {
         Bitmap3 result = canvas.clone();
         if (has_rectangle) {

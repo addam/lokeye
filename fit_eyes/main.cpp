@@ -8,6 +8,7 @@ int main(int argc, char** argv)
     Face state = mark_eyes(reference_image);
     Image image;
     while (char(cv::waitKey(20)) != 27 and image.read(cam)) {
+        cv::waitKey();
         state.refit(image);
         state.render(image);
         printf("done\n");
