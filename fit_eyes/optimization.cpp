@@ -21,10 +21,12 @@ void Face::refit(Image &img)
 
 void Eye::refit(Image &img, const Transformation &tsf)
 {
-    for (int iteration=0; iteration < 10; iteration++) {
+    const int iteration_count = 20;
+    for (int iteration=0; iteration < iteration_count; iteration++) {
+        float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));
         Vector2 delta_pos = {sum_boundary_dp(img.d(D::XX), img.d(D::XY), tsf), sum_boundary_dp(img.d(D::XY), img.d(D::YY), tsf)};
-        float delta_radius = sum_boundary_dr(img, tsf);
-        float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1]), std::abs(delta_radius), 1e-5f});
+        //float delta_radius = sum_boundary_dr(img, tsf);
+        float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1])/*, std::abs(delta_radius)*/, 1e-5f});
         //printf("step %g * (move %g, %g; radius %g)\n", step, delta_pos[0], delta_pos[1], delta_radius);
         pos += step * delta_pos;
         //radius += step * delta_radius;
