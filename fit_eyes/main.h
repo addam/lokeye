@@ -89,6 +89,8 @@ struct Image
     };
     Bitmap3 data;
     std::array<Bitmap3, 5> derivatives;
+    Image();
+    Image(const Image&);
     bool read(VideoCapture &cap);
     Iterrect region() const;
     Color operator () (Pixel) const;
@@ -102,7 +104,9 @@ struct Image
 struct Transformation
 {
     using Params = Vector3;
+    const Vector3 static_params;
     Params params;
+    Transformation(Rect region);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
     Vector2 inverse(Vector2) const;
@@ -137,10 +141,10 @@ struct Face
 {
     Iterrect region;
     std::array<Eye, 2> eyes;
-    Image &ref;
+    Image ref;
     Transformation tsf;
     Mask mask;
-    Face(Image &ref, cv::Rect region, Eye left_eye, Eye right_eye) : ref{ref}, region{region}, eyes{left_eye, right_eye}, mask{region} {
+    Face(const Image &ref, Rect region, Eye left_eye, Eye right_eye) : ref{ref}, tsf{region}, region{region}, eyes{left_eye, right_eye}, mask{region} {
         /// @todo initialize mask
     }
     void refit(Image&);

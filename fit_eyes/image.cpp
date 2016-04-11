@@ -25,17 +25,31 @@ void copyToCol(const Vector3 &v, cv::Matx<float, N, M> &m, int column)
 
 void sobel(const Bitmap3 &src, Bitmap3 &dst, int dx, int dy)
 {
-    const int ksize = 7;
+    const int ksize = 3;
     const int type = CV_32FC1;
     Bitmap1 tmp[3];
     cv::split(src, tmp);
     for (int i=0; i<3; i++) {
-        cv::Sobel(tmp[i], tmp[i], type, dx, dy, ksize, 1.0 / (1 << (2 * ksize - 3)));
-        double min = 0, max = 0;
-        cv::minMaxIdx(tmp[i], &min, &max);
-        printf("min %g, max %g\n", min, max);
+        cv::Sobel(tmp[i], tmp[i], type, dx, dy, ksize, 1.0 / (1 << (2 * ksize - 2 - dx - dy)));
+        //double min = 0, max = 0;
+        //cv::minMaxIdx(tmp[i], &min, &max);
+        //printf("sobel min %g, max %g\n", min, max);
     }
     cv::merge(tmp, 3, dst);
+}
+
+Image::Image()
+{
+}
+
+Image::Image(const Image &img)
+{
+    data = img.data.clone();
+    for (size_t i=0; i<derivatives.size(); i++) {
+        if (not img.derivatives[i].empty()) {
+            derivatives[i] = img.derivatives[i].clone();
+        }
+    }
 }
 
 bool Image::read(VideoCapture &cap)
@@ -43,8 +57,11 @@ bool Image::read(VideoCapture &cap)
     cv::Mat tmp;
     bool result = cap.read(tmp);
     if (result) {
-        printf("convert to %s\n", cvtoa(data.type()));
         tmp.convertTo(data, data.type(), 1./255);
+        cv::pyrDown(data, data);
+        for (Bitmap3 &bm : derivatives) {
+            bm = Bitmap3();
+        }
     }
     return result;
 }

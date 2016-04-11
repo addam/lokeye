@@ -1,5 +1,6 @@
 #include "main.h"
 #include <vector>
+const char winname[] = "fit eyes";
 
 namespace {
 void onMouse(int, int, int, int, void*);
@@ -18,7 +19,7 @@ struct State
         cv::imshow(winname, canvas);
     }
     ~State() {
-        cv::destroyWindow(winname);
+        cv::setMouseCallback(winname, NULL, NULL);
     }
     void render() const {
         Bitmap3 result = canvas.clone();
@@ -64,25 +65,30 @@ void onMouse(int event, int x, int y, int, void* param)
 
 Face mark_eyes(Image &img)
 {
-    State state("mark eyes", img);
+    State state(winname, img);
     do {
-        cv::waitKey(100);
+        if (char(cv::waitKey(100)) == 27) {
+            exit(0);
+        }
     } while (not state.done());
     Face result{img, Rect{state.begin, state.end}, state.eyes[0], state.eyes[1]};
     return result;
 }
 
 void Face::render(const Image &image) const {
-    const char winname[] = "fit";
     Bitmap3 result = image.data.clone();
-    cv::RotatedRect shape{tsf(Vector2(region.x + 0.5 * region.width, region.y + 0.5 * region.height)), cv::Size2f(region.width, region.height), 180 * tsf.params[2] / float(M_PI)};
-    cv::Point2f vertices[4];
-    shape.points(vertices);
+    std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
+    std::for_each(vertices.begin(), vertices.end(), [this](Vector2 &v) { v = tsf(v); });
     for (int i = 0; i < 4; i++) {
-        cv::line(result, vertices[i], vertices[(i+1)%4], cv::Scalar(0, 1.0, 1.0));
+        cv::line(result, to_pixel(vertices[i]), to_pixel(vertices[(i+1)%4]), cv::Scalar(0, 1.0, 1.0));
     }
     for (const Eye &eye : eyes) {
         cv::circle(result, to_pixel(tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+    }
+    for (int i=0; i<2; i++) {
+        Vector2 pos = eyes[i].pos;
+        cv::putText(result, std::to_string(pos[0]), Pixel(0, 20 * i + 10), cv::FONT_HERSHEY_PLAIN, 0.5, cv::Scalar(0.3, 0.3, 1));
+        cv::putText(result, std::to_string(pos[1]), Pixel(20, 20 * i + 20), cv::FONT_HERSHEY_PLAIN, 0.5, cv::Scalar(0.3, 1, 0.3));
     }
     cv::imshow(winname, result);
 }
