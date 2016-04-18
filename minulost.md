@@ -68,3 +68,31 @@ Přečetl jsem články:
 ### A global geometric framework for nonlinear dimensionality reduction
   _Tenenbaum, Joshua B., Vin De Silva, and John C. Langford in science 290.5500 (2000): 2319-2323._
   Původní článek o široce používaném algoritmu Isomap. Trénovacím datům stanovíme euklidovskou metriku -- potřebujeme tedy mít data označená smysluplnými parametry. Pak vybudujeme graf namátkovým spojováním blízkých bodů hranou a ten graf se pokusíme deformovat do prostoru menší dimenze tak, aby se vzdálenosti zachovaly. Pro moje použití to ale postrádá smysl, protože data tvoří v prostoru parametrů docela kompaktní oblast (kompaktní v lidském smyslu).
+
+## Duben 2016
+
+### Etapa od 29. března
+
+Nápady:
+ * zkusit v obrázku fitovat jen oblast kolem očí a to jen plošně, pro co nejjednodušší výpočet
+
+Napsal jsem program _fit_eyes_: grafický nástroj na živé sledování obličeje a očí ve videu z webkamery. Posuv a rotace velmi dobře stačí pro sledování obličeje ve videu, ale otáčením hlavy doleva a doprava se výsledky znatelně rozjedou od správných hodnot.
+
+### Etapa od 12. dubna
+
+Přečíst články:
+ * In the Eye of the Beholder: A Survey of Models for Eyes and Gaze. _Hansen, Ji in IEEE PAMI 2010._ Velmi pěkný přehled. Dále prozkoumat: [166] fitování víček parabolou; [5][42][23][77] detekce mrknutí; [123] databáze testovacích dat; [95] přehled klávesnic na obrazovce; [140] Listing's laws, Donder's law? ; [79] dobré výsledky. Dobré připomenutí, že zornička se může posunout oproti duhovce, kvůli lomu.
+ * A Survey on Eye-Gaze Tracking Techniques. _Chennamma, Yuan in IJCSE 2012._ Vyjmenovává vtipná hardwarová řešení jako kontaktní čočky se zrcátky, ale nic moc užitečného pro mě.
+ * Techniques Used for Eye Gaze Interfaces and Survey. _Rashid, Mehmood, Ashraf in IJASR 2015._ Nedočetl jsem, je to strašná angličtina a zřejmě neříká nic nového.
+ * Subpixel Eye Gaze Tracking. _Zhu, Yang in ? 2012._ Jednoduché fitování na koutky očí a na duhovku. Směr pohledu prý stačí fitovat jako lineární funkci, to by bylo milé.
+ * Appearance-based Eye Gaze Estimation. _Tan, Kriegman, Ahuja in IEEE WACV 2012._
+ * Eye Gaze Estimation from a Single Image of One Eye. _Wang, Sung, Venkateswarlu in IEEE ICCV 2003._
+ * A Novel Gaze Estimation System With One Calibration Point. _Villanueva, Cabeza in IEEE SMC 2008._
+ * Resolution of Focus of Attention Using Gaze Direction Estimation and Saliency Computation. _Yücel, Salah in IEEE ? 2009._
+ * A Method of Gaze Direction Estimation Considering Head Posture. _Zhang, Wang, Xu, Cong in IJSPIPPR 2013._
+
+Nápady:
+ * jednoduchý, jak to jde (lineární) odhad, kam se uživatel kouká, a UI na kalibraci
+ * program, co bude malovat terčík a trasu uživatelova pohledu
+ * přepsat výpočet, aby běžel v pyramidě
+ * celkově úspornější výpočet
