@@ -7,9 +7,9 @@ int main(int argc, char** argv)
     reference_image.read(cam);
     Face state = mark_eyes(reference_image);
     Image image;
-    while (char(cv::waitKey(5)) != 27 and image.read(cam)) {
+    for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
         //cv::waitKey();
-        state.refit(image);
+        state.refit(image, 0);
         state.render(image);
     }
     return 0;

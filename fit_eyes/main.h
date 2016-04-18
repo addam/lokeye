@@ -147,7 +147,7 @@ struct Face
     Face(const Image &ref, Rect region, Eye left_eye, Eye right_eye) : ref{ref}, tsf{region}, region{region}, eyes{left_eye, right_eye}, mask{region} {
         /// @todo initialize mask
     }
-    void refit(Image&);
+    void refit(Image&, bool only_eyes=false);
     void render(const Image&) const;
 };
 

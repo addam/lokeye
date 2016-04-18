@@ -1,18 +1,20 @@
 #include "main.h"
 using D = Image::Order;
 
-void Face::refit(Image &img)
+void Face::refit(Image &img, bool only_eyes)
 {
-    for (int iteration=0; iteration < 30; iteration++) {
-        cv::Matx<float, 1, 3> grad = {0, 0, 0};
-        auto rotregion = Rect(to_pixel(tsf(Vector2(region.x, region.y))), region.size());
-        for (Pixel p : region) {
-            cv::Matx<float, 3, 1> diff = img(tsf(p)) - ref(p);
-            grad += diff.t() * img.grad(tsf(p)) * tsf.grad(p);
+    if (not only_eyes) {
+        for (int iteration=0; iteration < 30; iteration++) {
+            cv::Matx<float, 1, 3> grad = {0, 0, 0};
+            auto rotregion = Rect(to_pixel(tsf(Vector2(region.x, region.y))), region.size());
+            for (Pixel p : region) {
+                cv::Matx<float, 3, 1> diff = img(tsf(p)) - ref(p);
+                grad += diff.t() * img.grad(tsf(p)) * tsf.grad(p);
+            }
+            float length = region.max([this, grad](Pixel corner) { return cv::norm(tsf.grad(corner) * grad.t()); }, 1e-5);
+            //printf("step (%g, %g, %g) / %g\n", grad(0), grad(1), grad(2), length);
+            tsf.params -= (1/length) * grad.t();
         }
-        float length = region.max([this, grad](Pixel corner) { return cv::norm(tsf.grad(corner) * grad.t()); }, 1e-5);
-        //printf("step (%g, %g, %g) / %g\n", grad(0), grad(1), grad(2), length);
-        tsf.params -= (1/length) * grad.t();
     }
     for (Eye &eye : eyes) {
         eye.refit(img, tsf);

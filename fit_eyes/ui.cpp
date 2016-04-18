@@ -85,9 +85,10 @@ void Face::render(const Image &image) const {
     for (const Eye &eye : eyes) {
         cv::circle(result, to_pixel(tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
     }
+    const float font_size = 1;
     for (int i=0; i<2; i++) {
-        cv::putText(result, std::to_string(eyes[i].pos[0]), Pixel(0, 20 * i + 10), cv::FONT_HERSHEY_PLAIN, 0.5, cv::Scalar(0.3, 0.3, 1));
-        cv::putText(result, std::to_string(eyes[i].pos[1]), Pixel(20, 20 * i + 20), cv::FONT_HERSHEY_PLAIN, 0.5, cv::Scalar(0.3, 1, 0.3));
+        cv::putText(result, std::to_string(eyes[i].pos[0]), Pixel(0, font_size * (24 * i + 12)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.2, 0.5, 1), font_size + 1);
+        cv::putText(result, std::to_string(eyes[i].pos[1]), Pixel(20, font_size * (24 * i + 24)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.3, 1, 0.3), font_size + 1);
     }
     cv::imshow(winname, result);
 }

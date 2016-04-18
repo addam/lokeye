@@ -58,7 +58,7 @@ bool Image::read(VideoCapture &cap)
     bool result = cap.read(tmp);
     if (result) {
         tmp.convertTo(data, data.type(), 1./255);
-        cv::pyrDown(data, data);
+        //cv::pyrDown(data, data);
         for (Bitmap3 &bm : derivatives) {
             bm = Bitmap3();
         }
