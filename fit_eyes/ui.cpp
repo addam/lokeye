@@ -1,5 +1,6 @@
 #include "main.h"
 #include <vector>
+#include <iostream>
 const char winname[] = "fit eyes";
 
 namespace {
@@ -91,4 +92,49 @@ void Face::render(const Image &image) const {
         cv::putText(result, std::to_string(eyes[i].pos[1]), Pixel(20, font_size * (24 * i + 24)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.3, 1, 0.3), font_size + 1);
     }
     cv::imshow(winname, result);
+}
+
+Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
+{
+    const int divisions = 3;
+    const char winname[] = "calibrate";
+    const Vector3 bgcolor(0.7, 0.6, 0.5);
+    std::vector<std::pair<Vector2, Vector2>> measurements;
+    Bitmap3 canvas(window_size.y, window_size.x);
+    canvas = bgcolor;
+    cv::namedWindow(winname);
+    cv::imshow(winname, canvas);
+    Vector2 cell(window_size.x / divisions, window_size.y / divisions);
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_real_distribution<> urand(0, 1);
+    for (int run=0; run < 2; run++) {
+        std::vector<Vector2> points;
+        for (int i=0; i<divisions; i++) {
+            for (int j=0; j<divisions; j++) {
+                points.emplace_back(cell[0] * (j + urand(generator)), cell[1] * (i + urand(generator)));
+            }
+        }
+        std::shuffle(points.begin(), points.end(), generator);
+        for (Vector2 point : points) {
+            canvas = bgcolor;
+            cv::circle(canvas, to_pixel(point), 50, cv::Scalar(0, 0.6, 1), -1);
+            cv::circle(canvas, to_pixel(point), 5, cv::Scalar(0, 0, 0.3), -1);
+            cv::imshow(winname, canvas);
+            cv::waitKey(400);
+            Image img;
+            img.read(cap);
+            canvas = bgcolor;
+            cv::imshow(winname, canvas);
+            cv::waitKey(40);
+            face.refit(img);
+            measurements.emplace_back(std::make_pair(face(), point));
+        }
+    }
+    cv::destroyWindow(winname);
+    Gaze result(measurements);
+    for (auto pair : measurements) {
+        std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << std::endl;
+    }
+    return result;
 }

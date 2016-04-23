@@ -1,5 +1,54 @@
 #include "main.h"
+#include <iostream>
 using D = Image::Order;
+
+Gaze::Gaze(std::vector<std::pair<Vector2, Vector2>> pairs)
+{
+    Vector2 center_left = {0, 0}, center_right = {0, 0};
+    const int count = pairs.size();
+    float scale_left = 1, scale_right = 1;
+    for (auto pair : pairs) {
+        center_left += pair.first / count;
+        center_right += pair.second / count;
+    }
+    for (auto &pair : pairs) {
+        pair.first -= center_left;
+        pair.second -= center_right;
+        scale_left += cv::norm(pair.first) / count;
+        scale_right += cv::norm(pair.second) / count;
+    }
+    for (auto &pair : pairs) {
+        pair.first /= scale_left;
+        pair.second /= scale_right;
+    }
+    cv::Mat_<Vector3> system(0, 3);
+    for (auto pair : pairs) {
+        std::cout << "pair " << pair.first << " <--> " << pair.second << std::endl;
+        Vector3 pst{pair.first(0), pair.first(1), 1};
+        cv::Mat_<Vector3> row(1, 3);
+        row << Vector3(0, 0, 0), -1 * pst, pair.second(1) * pst;
+        system.push_back(row);
+        row << 1 * pst, Vector3(0, 0, 0), -pair.second(0) * pst;
+        system.push_back(row);
+    }
+    std::cout << "solve system: " << system << std::endl;
+    cv::Mat_<float> systemf = system.reshape(1);
+    cv::Mat_<float> h;
+    cv::SVD::solveZ(systemf, h);
+    h = h.reshape(0, 3);
+    std::cout << "produces: " << h << std::endl;
+    //denormalize
+    cv::Mat_<float> denor_left = (cv::Mat_<float>(3, 3) << 1, 0, -center_left(0), 0, 1, -center_left(1), 0, 0, scale_left);
+    cv::Mat_<float> denor_right = (cv::Mat_<float>(3, 3) << scale_right, 0, center_right(0), 0, scale_right, center_right(1), 0, 0, 1);
+    fn = cv::Mat_<float>(denor_right * h * denor_left);
+}
+
+Vector2 Gaze::operator () (Vector2 v) const
+{
+    Vector3 h{v(0), v(1), 1};
+    h = fn * h;
+    return {h(0) / h(2), h(1) / h(2)};
+}
 
 void Face::refit(Image &img, bool only_eyes)
 {
@@ -19,6 +68,11 @@ void Face::refit(Image &img, bool only_eyes)
     for (Eye &eye : eyes) {
         eye.refit(img, tsf);
     }
+}
+
+Vector2 Face::operator () () const
+{
+    return eyes[0].pos + eyes[1].pos;
 }
 
 void Eye::refit(Image &img, const Transformation &tsf)

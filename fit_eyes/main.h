@@ -5,11 +5,13 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <array>
+#include <vector>
 
 using Pixel = cv::Point;
 using Vector2 = cv::Vec2f;
 using Vector3 = cv::Vec3f;
 using Matrix22 = cv::Matx22f;
+using Matrix3 = cv::Matx33f;
 using Matrix23 = cv::Matx23f;
 using Matrix32 = cv::Matx32f;
 using cv::VideoCapture;
@@ -116,6 +118,13 @@ struct Transformation
     Matrix23 grad(Pixel p) const { return this->grad(to_vector(p)); }
 };
 
+struct Gaze
+{
+    Matrix3 fn;
+    Gaze(std::vector<std::pair<Vector2, Vector2>>);
+    Vector2 operator () (Vector2) const;
+};
+
 struct Mask
 {
     Pixel offset;
@@ -148,9 +157,11 @@ struct Face
         /// @todo initialize mask
     }
     void refit(Image&, bool only_eyes=false);
+    Vector2 operator() () const;
     void render(const Image&) const;
 };
 
 Face mark_eyes(Image&);
+Gaze calibrate(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 
 #endif // MAIN_H
