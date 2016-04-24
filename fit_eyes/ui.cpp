@@ -108,7 +108,8 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
     std::random_device rd;
     std::mt19937 generator(rd());
     std::uniform_real_distribution<> urand(0, 1);
-    for (int run=0; run < 5; run++) {
+    std::pair<Image, Vector2> task;
+    while (1) {
         std::vector<Vector2> points;
         for (int i=0; i<divisions; i++) {
             for (int j=0; j<divisions; j++) {
@@ -121,15 +122,15 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             cv::circle(canvas, to_pixel(point), 50, cv::Scalar(0, 0.6, 1), -1);
             cv::circle(canvas, to_pixel(point), 5, cv::Scalar(0, 0, 0.3), -1);
             cv::imshow(winname, canvas);
+            if (not task.first.data.empty()) {
+                face.refit(task.first);
+                measurements.emplace_back(std::make_pair(face(), task.second));
+            }
             cv::waitKey(400);
-            Image img;
-            do {
-                img.read(cap);
-                face.refit(img);
-                face.render(img);
-            } while (false and char(cv::waitKey()) != ' ');
-            measurements.emplace_back(std::make_pair(face(), point));
+            task.first.read(cap);
+            task.second = point;
         }
+        break;
     }
     cv::destroyWindow(winname);
     Gaze result(measurements);
