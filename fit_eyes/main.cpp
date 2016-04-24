@@ -29,7 +29,7 @@ int main(int argc, char** argv)
         if (inside(pos, size) and inside(prev_pos, size)) {
             cv::line(record, to_pixel(prev_pos), to_pixel(pos), cv::Scalar(0.5, 0.7, 1));
         }
-        if (i % 5 == 0) {
+        if (i % 2 == 0) {
             cv::imshow("record", record);
         }
         prev_pos = pos;

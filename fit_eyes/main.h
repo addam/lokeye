@@ -6,6 +6,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <array>
 #include <vector>
+#include <chrono>
 
 using Pixel = cv::Point;
 using Vector2 = cv::Vec2f;
@@ -16,6 +17,7 @@ using Matrix23 = cv::Matx23f;
 using Matrix32 = cv::Matx32f;
 using cv::VideoCapture;
 using cv::Rect;
+using TimePoint = std::chrono::high_resolution_clock::time_point;
 
 using Color = Vector3;
 using Bitmap1 = cv::Mat_<float>;

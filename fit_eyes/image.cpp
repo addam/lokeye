@@ -54,16 +54,24 @@ Image::Image(const Image &img)
 
 bool Image::read(VideoCapture &cap)
 {
-    cv::Mat tmp;
-    bool result = cap.read(tmp);
-    if (result) {
-        tmp.convertTo(data, data.type(), 1./255);
-        //cv::pyrDown(data, data);
-        for (Bitmap3 &bm : derivatives) {
-            bm = Bitmap3();
+    while (1) {
+        // make sure that we got a new image
+        TimePoint time_start = std::chrono::high_resolution_clock::now();
+        if (not cap.grab()) {
+            return false;
+        }
+        if (std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count() * cap.get(cv::CAP_PROP_FPS) > 0.5) {
+            break;
         }
     }
-    return result;
+    cv::Mat tmp;
+    cap.retrieve(tmp);
+    tmp.convertTo(data, data.type(), 1./255);
+    //cv::pyrDown(data, data);
+    for (Bitmap3 &bm : derivatives) {
+        bm = Bitmap3();
+    }
+    return true;
 }
 
 Iterrect Image::region() const
