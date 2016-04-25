@@ -8,7 +8,7 @@ Transformation::Transformation(Rect region):
 Vector2 Transformation::operator () (Vector2 v) const
 {
     float angle = 3 * params[2] / static_params[2], s = sin(angle), c = cos(angle);
-    Matrix22 rot = {c, -s, s, c};
+    Matrix2 rot = {c, -s, s, c};
     v = Vector2(v[0] - static_params[0], v[1] - static_params[1]);
     return Vector2(params[0], params[1]) + rot * v;
 }
@@ -24,7 +24,7 @@ Matrix23 Transformation::grad(Vector2 v) const
 Vector2 Transformation::inverse(Vector2 v) const
 {
     float angle = 3 * params[2] / static_params[2], s = sin(angle), c = cos(angle);
-    Matrix22 rot = {c, s, -s, c};
+    Matrix2 rot = {c, s, -s, c};
     v = Vector2(v[0] - params[0], v[1] - params[1]);
     return Vector2(static_params[0], static_params[1]) + rot * v;    
 }

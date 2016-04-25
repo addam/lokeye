@@ -11,10 +11,11 @@
 using Pixel = cv::Point;
 using Vector2 = cv::Vec2f;
 using Vector3 = cv::Vec3f;
-using Matrix22 = cv::Matx22f;
+using Matrix2 = cv::Matx22f;
 using Matrix3 = cv::Matx33f;
 using Matrix23 = cv::Matx23f;
 using Matrix32 = cv::Matx32f;
+using Matrix = cv::Mat_<float>;
 using cv::VideoCapture;
 using cv::Rect;
 using TimePoint = std::chrono::high_resolution_clock::time_point;
@@ -123,7 +124,7 @@ struct Transformation
 struct Gaze
 {
     Matrix3 fn;
-    Gaze(std::vector<std::pair<Vector2, Vector2>>);
+    Gaze(const std::vector<std::pair<Vector2, Vector2>>&, int &out_support, float precision=50);
     Vector2 operator () (Vector2) const;
 };
 

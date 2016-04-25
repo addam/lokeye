@@ -126,16 +126,21 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
                 face.refit(task.first);
                 measurements.emplace_back(std::make_pair(face(), task.second));
             }
+            const int necessary_support = divisions * divisions;
+            if (measurements.size() >= necessary_support) {
+                int support;
+                Gaze result(measurements, support, 100);
+                if (support >= necessary_support) {
+                    cv::destroyWindow(winname);
+                    for (auto pair : measurements) {
+                        std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << std::endl;
+                    }
+                    return result;
+                }
+            }
             cv::waitKey(400);
             task.first.read(cap);
             task.second = point;
         }
-        break;
     }
-    cv::destroyWindow(winname);
-    Gaze result(measurements);
-    for (auto pair : measurements) {
-        std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << std::endl;
-    }
-    return result;
 }

@@ -1,12 +1,23 @@
 #include "main.h"
 #include <iostream>
 using D = Image::Order;
+using Measurements = std::vector<std::pair<Vector2, Vector2>>;
 
-Gaze::Gaze(std::vector<std::pair<Vector2, Vector2>> pairs)
+Vector2 project(Vector2 v, const Matrix3 &h)
+{
+    Vector3 result{v(0), v(1), 1};
+    result = h * result;
+    return Vector2{result(0) / result(2), result(1) / result(2)};
+}
+
+/** Direct linear transform from pair.first to pair.second
+ * Beware: the input data is modified (normalized, to be exact) in the process
+ */
+Matrix3 homography(Measurements &pairs)
 {
     Vector2 center_left = {0, 0}, center_right = {0, 0};
     const int count = pairs.size();
-    float scale_left = 1, scale_right = 1;
+    float scale_left = 0, scale_right = 0;
     for (auto pair : pairs) {
         center_left += pair.first / count;
         center_right += pair.second / count;
@@ -21,26 +32,86 @@ Gaze::Gaze(std::vector<std::pair<Vector2, Vector2>> pairs)
         pair.first /= scale_left;
         pair.second /= scale_right;
     }
-    cv::Mat_<Vector3> system(0, 3);
+    Bitmap3 system(0, 3);
     for (auto pair : pairs) {
-        std::cout << "pair " << pair.first << " <--> " << pair.second << std::endl;
+        //std::cout << "pair " << pair.first << " <--> " << pair.second << std::endl;
         Vector3 pst{pair.first(0), pair.first(1), 1};
-        cv::Mat_<Vector3> row(1, 3);
+        Bitmap3 row(1, 3);
         row << Vector3(0, 0, 0), -1 * pst, pair.second(1) * pst;
         system.push_back(row);
         row << 1 * pst, Vector3(0, 0, 0), -pair.second(0) * pst;
         system.push_back(row);
     }
-    std::cout << "solve system: " << system << std::endl;
-    cv::Mat_<float> systemf = system.reshape(1);
-    cv::Mat_<float> h;
+    //std::cout << "solve system: " << system << std::endl;
+    Bitmap1 systemf = system.reshape(1);
+    Bitmap1 h;
     cv::SVD::solveZ(systemf, h);
     h = h.reshape(0, 3);
-    std::cout << "produces: " << h << std::endl;
-    //denormalize
-    cv::Mat_<float> denor_left = (cv::Mat_<float>(3, 3) << 1, 0, -center_left(0), 0, 1, -center_left(1), 0, 0, scale_left);
-    cv::Mat_<float> denor_right = (cv::Mat_<float>(3, 3) << scale_right, 0, center_right(0), 0, scale_right, center_right(1), 0, 0, 1);
-    fn = cv::Mat_<float>(denor_right * h * denor_left);
+    //std::cout << "produces: " << h << std::endl;
+    Bitmap1 normalize = (Bitmap1(3, 3) << 1, 0, -center_left(0), 0, 1, -center_left(1), 0, 0, scale_left);
+    Bitmap1 denormalize = (Bitmap1(3, 3) << scale_right, 0, center_right(0), 0, scale_right, center_right(1), 0, 0, 1);
+    return Bitmap1(denormalize * h * normalize);
+}
+
+template<int size>
+Measurements random_sample(const Measurements &pairs)
+{
+    std::array<int, size> indices;
+    std::random_device rd;
+    std::minstd_rand generator(rd());
+    for (int i=0; i<size; i++) {
+        int high = pairs.size() - size + i;
+        auto it = indices.begin() + i;
+        int index = std::uniform_int_distribution<>(0, high - 1)(generator);
+        *it = (std::find(indices.begin(), it, index) == it) ? index : high;
+    }
+    Measurements result;
+    result.reserve(size);
+    std::transform(indices.begin(), indices.end(), std::back_inserter(result), [pairs](int index) { return pairs[index]; });
+    return result;
+}
+
+Measurements support(const Matrix3 h, const Measurements &pairs, const float precision)
+{
+    Measurements result;
+    std::copy_if(pairs.begin(), pairs.end(), std::back_inserter(result), [h, precision](std::pair<Vector2, Vector2> p) { return cv::norm(project(p.first, h) - p.second) < precision; });
+    return result;
+}
+
+template<int count>
+float combinations_ratio(int count_total, int count_good)
+{
+    float result = 0;
+    if (count_total < count or count_good < count) {
+        return 0;
+    }
+    for (int i=0; i<count; i++) {
+        result += std::log((count_total - i) / float(count_good - i));
+    }
+    printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
+    return result;
+}
+
+Gaze::Gaze(const Measurements &pairs, int &out_support, float precision)
+{
+    out_support = 0;
+    float iterations = combinations_ratio<4>(pairs.size(), 4);
+    for (int i=0; i < iterations; i++) {
+        std::vector<std::pair<Vector2, Vector2>> sample = random_sample<4>(pairs);
+        size_t prev_sample_size;
+        Matrix3 h;
+        do {
+            prev_sample_size = sample.size();
+            h = homography(sample);
+            sample = support(h, pairs, precision);
+        } while (sample.size() > prev_sample_size);
+        if (sample.size() > out_support) {
+            out_support = sample.size();
+            fn = h;
+            iterations = combinations_ratio<4>(pairs.size(), sample.size());
+        }
+    }
+    printf("support = %i / %lu, %f %f %f; %f %f %f; %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(1,0), fn(1,1), fn(1,2), fn(2,0), fn(2,1), fn(2,2));
 }
 
 Vector2 Gaze::operator () (Vector2 v) const
