@@ -27,10 +27,11 @@ void sobel(const Bitmap3 &src, Bitmap3 &dst, int dx, int dy)
 {
     const int ksize = 3;
     const int type = CV_32FC1;
+    const int kernel_norm = (ksize == 1) ? 2 : (1 << (2 * ksize - 2 - dx - dy));
     Bitmap1 tmp[3];
     cv::split(src, tmp);
     for (int i=0; i<3; i++) {
-        cv::Sobel(tmp[i], tmp[i], type, dx, dy, ksize, 1.0 / (1 << (2 * ksize - 2 - dx - dy)));
+        cv::Sobel(tmp[i], tmp[i], type, dx, dy, ksize, 1.0 / kernel_norm);
         //double min = 0, max = 0;
         //cv::minMaxIdx(tmp[i], &min, &max);
         //printf("sobel min %g, max %g\n", min, max);

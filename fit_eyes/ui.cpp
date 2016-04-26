@@ -124,6 +124,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             cv::imshow(winname, canvas);
             if (not task.first.data.empty()) {
                 face.refit(task.first);
+                face.render(task.first);
                 measurements.emplace_back(std::make_pair(face(), task.second));
             }
             const int necessary_support = divisions * divisions;

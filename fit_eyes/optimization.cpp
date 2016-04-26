@@ -149,6 +149,10 @@ Vector2 Face::operator () () const
 void Eye::refit(Image &img, const Transformation &tsf)
 {
     const int iteration_count = 20;
+    const float max_distance = 2 * radius;
+    if (cv::norm(pos - init_pos) > max_distance) {
+        pos = init_pos;
+    }
     for (int iteration=0; iteration < iteration_count; iteration++) {
         float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));
         Vector2 delta_pos = {sum_boundary_dp(img.d(D::XX), img.d(D::XY), tsf), sum_boundary_dp(img.d(D::XY), img.d(D::YY), tsf)};

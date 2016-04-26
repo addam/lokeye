@@ -141,7 +141,10 @@ struct Mask
 struct Eye
 {
     Vector2 pos;
+    Vector2 init_pos;
     float radius;
+    Eye(Vector2 pos, float radius) : pos{pos}, init_pos{pos}, radius{radius} {
+    }
     void refit(Image&, const Transformation&);
 protected:
     float sum_boundary_dp(const Bitmap3 &img_x, const Bitmap3 &img_y, const Transformation&);

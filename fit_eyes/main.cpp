@@ -16,8 +16,9 @@ int main(int argc, char** argv)
     Face state = mark_eyes(reference_image);
     Pixel size(1400, 700);
     Gaze fit = calibrate(state, cam, size);
+    const Vector3 bg_color(0.4, 0.3, 0.3);
     Bitmap3 record(size.y, size.x);
-    record = Vector3(0.4, 0.3, 0.3);
+    record = bg_color;
     Image image;
     Vector2 prev_pos(-1, -1);
     for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
@@ -31,6 +32,8 @@ int main(int argc, char** argv)
         }
         if (i % 2 == 0) {
             cv::imshow("record", record);
+            const float decay = 0.1;
+            record = decay * bg_color + (1 - decay) * record;
         }
         prev_pos = pos;
     }
