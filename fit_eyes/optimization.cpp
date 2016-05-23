@@ -81,13 +81,8 @@ Measurements support(const Matrix3 h, const Measurements &pairs, const float pre
 template<int count>
 float combinations_ratio(int count_total, int count_good)
 {
-    float result = 0;
-    if (count_total < count or count_good < count) {
-        return 0;
-    }
-    for (int i=0; i<count; i++) {
-        result += std::log((count_total - i) / float(count_good - i));
-    }
+    const float logp = -2;
+    float result = logp / std::log(1 - pow2(pow2(count_good / float(count_total))));
     printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
     return result;
 }
