@@ -12,6 +12,9 @@ all: $(BIN)
 $(BIN): $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
+test_bitmap: test_bitmap.cpp bitmap.o
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+
 $(OBJS): %.o: %.cpp main.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
