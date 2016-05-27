@@ -85,14 +85,29 @@ Přečíst články:
  * A Survey on Eye-Gaze Tracking Techniques. _Chennamma, Yuan in IJCSE 2012._ Vyjmenovává vtipná hardwarová řešení jako kontaktní čočky se zrcátky, ale nic moc užitečného pro mě.
  * Techniques Used for Eye Gaze Interfaces and Survey. _Rashid, Mehmood, Ashraf in IJASR 2015._ Nedočetl jsem, je to strašná angličtina a zřejmě neříká nic nového.
  * Subpixel Eye Gaze Tracking. _Zhu, Yang in ? 2012._ Jednoduché fitování na koutky očí a na duhovku. Směr pohledu prý stačí fitovat jako lineární funkci, to by bylo milé.
- * Appearance-based Eye Gaze Estimation. _Tan, Kriegman, Ahuja in IEEE WACV 2012._
- * Eye Gaze Estimation from a Single Image of One Eye. _Wang, Sung, Venkateswarlu in IEEE ICCV 2003._
- * A Novel Gaze Estimation System With One Calibration Point. _Villanueva, Cabeza in IEEE SMC 2008._
- * Resolution of Focus of Attention Using Gaze Direction Estimation and Saliency Computation. _Yücel, Salah in IEEE ? 2009._
- * A Method of Gaze Direction Estimation Considering Head Posture. _Zhang, Wang, Xu, Cong in IJSPIPPR 2013._
+ * Appearance-based Eye Gaze Estimation. _Tan, Kriegman, Ahuja in IEEE WACV 2002._ Najdou několik nejbližších sousedů v databázi očí a interpolují. Důležité prý je zohlednit zároveň s normou rozdílu obrázků oka i vzdálenost v prostoru parametrů -- napříč nalezenými sousedy, aby tvořili souvislou oblast. Článek ale nepopisuje, jak se hledají oči a jestli odhadují natočení hlavy; tipuju, že hlava je při měření fixovaná.
+ * Eye Gaze Estimation from a Single Image of One Eye. _Wang, Sung, Venkateswarlu in IEEE ICCV 2003._ Autoři nemají úplně dobrý cit na rozlišení podstatných informací od šumu, a promítá se to ostatně i do samotné metody. Zorničku v obrázku nafitují elipsou a z tvaru elipsy pak přímo dopočítají, jak je oko natočené. Na uměle vytvořených datech to funguje, v praxi to vyžaduje kameru zacílenou přímo na oko a ani tak nejsou výsledky moc přesvědčivé. Zajímavá myšlenka je, že zorničku hledají jen pomocí vodorovné derivace, to znamená svislých kontur.
+ * A Novel Gaze Estimation System With One Calibration Point. _Villanueva, Cabeza in IEEE SMC 2008._ Elegantně se vyhýbají potřebě sledovat obličej: na oku najdou odlesk ze známého zdroje (LED dioda) a panenku, což už dává o natočení oka dost informace. Je působivé, že se jim daří zacházet s tak detailním obrazem. Aby to fungovalo, budují velmi poctivý model toho, jak oko vypadá: oční bulva a rohovka jsou dvě kulové plochy, sklivec má známý index lomu, žlutá skvrna je od optické osy oka odchýlená o asi 5 stupňů. Prozkoumat: Donder's law [21]
+ * Resolution of Focus of Attention Using Gaze Direction Estimation and Saliency Computation. _Yücel, Salah in IEEE ? 2009._ Okultismus s neuronovými sítěmi. Tvar hlavy považují za válec a jeho pozici i natočení najdou ve snímku pomocí KLT trackeru. Výsledných šest parametrů (a nic víc) dostane neuronová síť, která má vyvěštit, kam se uživatel dívá; navíc se bere v potaz, které části výhledu by uživatele mohly zajímat. Možná to v praxi funguje, ale jako přístup je to hrozné. Přesnost pro moje účely nestačí. Prozkoumat: směr pohledu z natočení hlay [12]
+ * A Method of Gaze Direction Estimation Considering Head Posture. _Zhang, Wang, Xu, Cong in IJSPIPPR 2013._ Roztomile naivní postup: najít oči a pusu pomocí klouzajícího okna Adaboost klasifikátoru a ze získaných vzdáleností přímo trigonometricky napočítat natočení hlavy. Pozici zorničky najdou Houghovou transformací s přesností na devět možných směrů.
 
 Nápady:
  * jednoduchý, jak to jde (lineární) odhad, kam se uživatel kouká, a UI na kalibraci
  * program, co bude malovat terčík a trasu uživatelova pohledu
  * přepsat výpočet, aby běžel v pyramidě
  * celkově úspornější výpočet
+ 
+### Etapa od 28. dubna
+
+Výpočet funguje, ale nedává vůbec dobré výsledky a není jasné proč.
+Návrh: namísto kalibrace náhodným střílením projít několik bodů na přímce a prohlédnout si, jaká data vycházejí v takovém případě.
+
+Přepsal jsem datovou strukturu pro obrázek, aby byla trochu přehlednější a především, aby mohla pokrývat jen malý výřez snímku, když je to potřeba.
+
+Přepsal jsem interpolaci obrázku a derivací prvního a druhého řádu. Bilineární interpolace obrázku je sama o sobě jednoduchá, teoreticky vzato ale vede k nespojité derivaci. Možností se nabízí několik:
+ * Úplně to odignorovat, jako všichni ostatní. Derivace se počítají z okolních dvou pixelů (potažmo čtyř v případě dxdy) a interpolovat se nechají zase bilineárně.
+ * Datům líp odpovídá, když je první derivace posunutá na půl cesty mezi příslušnými pixely, a obdobně dxdy derivace je ve středu příslušných čtyř pixelů. Z teoretického hlediska to pořád není správně, protože takhle interpolované derivace spojité budou.
+ * Teoreticky správné by bylo obrázek považovat za spojitou funkci a její derivace napočítat analyticky. Nejlákavější je použít Lanczosovu funkci sinc(x) * sinc(x/2); trápí mě ale, že konstantní signál interpolovaný touhle funkcí nezůstane konstantní. Filtrů, které by tuhle podmínku splňovaly a zároveň byly hladké, ale zřejmě není prozkoumaných moc a v praxi se nepoužívají. Jedna možnost je spartánský (cos(x) + 1)/2; po normalizaci na rozsah (-1...1) se ale ukáže, že derivace ve skutečnosti jsou příliš vysoké, že filtr vyrábí hrany navíc.
+Nevím, možná chci něco, co neexisuje. Prozatím si vystačím si bilineární interpolací posunutou o půlpixely (jsem přesvědčený, že na tom záleží). Tohle téma podle mě ale zaslouží v diplomce aspoň stranu textu.
+
+Průzkum, jak správně vyslovovat "Hough", mě navedl na zábavnou diskuzi: https://groups.google.com/forum/#!topic/misc.misc/m31Idr1tWzM
