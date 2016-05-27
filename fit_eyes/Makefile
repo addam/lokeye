@@ -12,7 +12,11 @@ all: $(BIN)
 $(BIN): $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
-test_bitmap: test_bitmap.cpp bitmap.o
+test_bitmap: bitmap.o
+test_main: bitmap.o transformation_locrot.o
+test_face: bitmap.o transformation_locrot.o optimization.o ui.o
+
+test_%: test_%.cpp
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 $(OBJS): %.o: %.cpp main.h
