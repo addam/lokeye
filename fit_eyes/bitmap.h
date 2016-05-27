@@ -12,14 +12,15 @@ class Bitmap : public cv::Mat_<T>
     inline int crop_horizontal(float x) const;
     inline T sample(Vector2) const;
 public:
-    const static bool half_shift;
-    Bitmap(DataType data=DataType(), Pixel offset={0, 0});
+    const static int halfpixels;
+    Bitmap(const DataType &data=DataType(), Pixel offset={0, 0});
     Bitmap(int rows, int cols, T value, Pixel offset={0, 0});
     Bitmap(Rect);
+    Bitmap<T> clone() const;
     
     using DataType::operator=;
     
-    T operator () (Vector2 pos, bool use_half_shift=half_shift) const;
+    T operator () (Vector2 pos) const;
     T& operator () (Pixel pos);
     const T& operator () (Pixel pos) const;
     

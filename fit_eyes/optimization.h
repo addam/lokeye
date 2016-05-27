@@ -3,7 +3,7 @@
 
 struct Gaze
 {
-    Matrix3 fn;
+    Matrix33 fn;
     Gaze(const std::vector<std::pair<Vector2, Vector2>>&, int &out_support, float precision=50);
     Vector2 operator () (Vector2) const;
 };
@@ -15,10 +15,10 @@ struct Eye
     float radius;
     Eye(Vector2 pos, float radius) : pos{pos}, init_pos{pos}, radius{radius} {
     }
-    void refit(Image&, const Transformation&);
+    void refit(const Bitmap3&, const Transformation&);
 protected:
-    float sum_boundary_dp(const Bitmap3 &img_x, const Bitmap3 &img_y, const Transformation&);
-    float sum_boundary_dr(Image&, const Transformation&);
+    float sum_boundary_dp(const Bitmap22&, int direction, const Transformation&);
+    float sum_boundary_dr(const Bitmap22&, const Transformation&);
     Iterrect region(const Transformation&) const;
 };
 
@@ -26,16 +26,16 @@ struct Face
 {
     Iterrect region;
     std::array<Eye, 2> eyes;
-    Image ref;
+    Bitmap3 ref;
     Transformation tsf;
-    Face(const Image &ref, Rect region, Eye left_eye, Eye right_eye) : ref{ref}, tsf{region}, region{region}, eyes{left_eye, right_eye} {
+    Face(const Bitmap3 &ref, Rect region, Eye left_eye, Eye right_eye) : ref{ref.clone()}, tsf{region}, region{region}, eyes{left_eye, right_eye} {
     }
-    void refit(Image&, bool only_eyes=false);
+    void refit(const Bitmap3&, bool only_eyes=false);
     Vector2 operator() () const;
-    void render(const Image&) const;
+    void render(const Bitmap3&) const;
 };
 
-Face mark_eyes(Image&);
+Face mark_eyes(Bitmap3&);
 Gaze calibrate(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 
 #endif

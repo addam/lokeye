@@ -71,6 +71,9 @@ struct Iterrect : public Rect {
     Iterator end() const {
         return Iterator{{tl().x, br().y}, br().x};
     }
+    bool contains(Vector2 v) const {
+        return Rect::contains(to_pixel(v));
+    }
     template<typename Func, typename T>
     T max(Func f, T init) const {
         const Pixel corners[] = {{x, y}, {x+width, y}, {x, y+height}, {x+width, y+height}};
@@ -88,11 +91,11 @@ struct Transformation
     const Vector3 static_params;
     Params params;
     Transformation(Rect region);
+    Transformation(Params, Vector3);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
-    Vector2 inverse(Vector2) const;
-    Params dx(Vector2) const;
-    Params dy(Vector2) const;
+    Rect operator () (Rect) const;
+    Transformation inverse() const;
     Matrix23 grad(Vector2) const;
     Matrix23 grad(Pixel p) const { return this->grad(to_vector(p)); }
 };

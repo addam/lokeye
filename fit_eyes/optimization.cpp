@@ -1,9 +1,10 @@
 #include "main.h"
+#include "bitmap.h"
+#include "optimization.h"
 #include <iostream>
-using D = Image::Order;
 using Measurements = std::vector<std::pair<Vector2, Vector2>>;
 
-Vector2 project(Vector2 v, const Matrix3 &h)
+Vector2 project(Vector2 v, const Matrix33 &h)
 {
     Vector3 result{v(0), v(1), 1};
     result = h * result;
@@ -13,7 +14,7 @@ Vector2 project(Vector2 v, const Matrix3 &h)
 /** Direct linear transform from pair.first to pair.second
  * Beware: the input data is modified (normalized, to be exact) in the process
  */
-Matrix3 homography(Measurements &pairs)
+Matrix33 homography(Measurements &pairs)
 {
     Vector2 center_left = {0, 0}, center_right = {0, 0};
     const int count = pairs.size();
@@ -32,25 +33,25 @@ Matrix3 homography(Measurements &pairs)
         pair.first /= scale_left;
         pair.second /= scale_right;
     }
-    Bitmap3 system(0, 3);
+    ColorMatrix system(0, 3);
     for (auto pair : pairs) {
         //std::cout << "pair " << pair.first << " <--> " << pair.second << std::endl;
         Vector3 pst{pair.first(0), pair.first(1), 1};
-        Bitmap3 row(1, 3);
+        ColorMatrix row(1, 3);
         row << Vector3(0, 0, 0), -1 * pst, pair.second(1) * pst;
         system.push_back(row);
         row << 1 * pst, Vector3(0, 0, 0), -pair.second(0) * pst;
         system.push_back(row);
     }
     //std::cout << "solve system: " << system << std::endl;
-    Bitmap1 systemf = system.reshape(1);
-    Bitmap1 h;
+    Matrix systemf = system.reshape(1);
+    Matrix h;
     cv::SVD::solveZ(systemf, h);
     h = h.reshape(0, 3);
     //std::cout << "produces: " << h << std::endl;
-    Bitmap1 normalize = (Bitmap1(3, 3) << 1, 0, -center_left(0), 0, 1, -center_left(1), 0, 0, scale_left);
-    Bitmap1 denormalize = (Bitmap1(3, 3) << scale_right, 0, center_right(0), 0, scale_right, center_right(1), 0, 0, 1);
-    return Bitmap1(denormalize * h * normalize);
+    Matrix normalize = (Matrix(3, 3) << 1, 0, -center_left(0), 0, 1, -center_left(1), 0, 0, scale_left);
+    Matrix denormalize = (Matrix(3, 3) << scale_right, 0, center_right(0), 0, scale_right, center_right(1), 0, 0, 1);
+    return Matrix(denormalize * h * normalize);
 }
 
 template<int size>
@@ -71,7 +72,7 @@ Measurements random_sample(const Measurements &pairs)
     return result;
 }
 
-Measurements support(const Matrix3 h, const Measurements &pairs, const float precision)
+Measurements support(const Matrix33 h, const Measurements &pairs, const float precision)
 {
     Measurements result;
     std::copy_if(pairs.begin(), pairs.end(), std::back_inserter(result), [h, precision](std::pair<Vector2, Vector2> p) { return cv::norm(project(p.first, h) - p.second) < precision; });
@@ -94,7 +95,7 @@ Gaze::Gaze(const Measurements &pairs, int &out_support, float precision)
     for (int i=0; i < iterations; i++) {
         std::vector<std::pair<Vector2, Vector2>> sample = random_sample<4>(pairs);
         size_t prev_sample_size;
-        Matrix3 h;
+        Matrix33 h;
         do {
             prev_sample_size = sample.size();
             h = homography(sample);
@@ -116,19 +117,22 @@ Vector2 Gaze::operator () (Vector2 v) const
     return {h(0) / h(2), h(1) / h(2)};
 }
 
-void Face::refit(Image &img, bool only_eyes)
+void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
     if (not only_eyes) {
+        Iterrect rotregion = tsf.inverse()(region);
+        Bitmap<Matrix32> grad = gradient(img, rotregion);
         for (int iteration=0; iteration < 30; iteration++) {
-            cv::Matx<float, 1, 3> grad = {0, 0, 0};
-            auto rotregion = Rect(to_pixel(tsf(Vector2(region.x, region.y))), region.size());
-            for (Pixel p : region) {
-                cv::Matx<float, 3, 1> diff = img(tsf(p)) - ref(p);
-                grad += diff.t() * img.grad(tsf(p)) * tsf.grad(p);
+            cv::Matx<float, 1, 3> delta_tsf = {0, 0, 0};
+            for (Pixel p : rotregion) {
+                if (region.contains(tsf(p))) {
+                    cv::Matx<float, 3, 1> diff = img(p) - ref(tsf(p));
+                    delta_tsf += diff.t() * grad(p) * tsf.grad(p);
+                }
             }
-            float length = region.max([this, grad](Pixel corner) { return cv::norm(tsf.grad(corner) * grad.t()); }, 1e-5);
+            float length = region.max([this, delta_tsf](Pixel corner) { return cv::norm(tsf.grad(corner) * delta_tsf.t()); }, 1e-5);
             //printf("step (%g, %g, %g) / %g\n", grad(0), grad(1), grad(2), length);
-            tsf.params -= (1/length) * grad.t();
+            tsf.params -= (1/length) * delta_tsf.t();
         }
     }
     for (Eye &eye : eyes) {
@@ -141,7 +145,24 @@ Vector2 Face::operator () () const
     return eyes[0].pos + eyes[1].pos;
 }
 
-void Eye::refit(Image &img, const Transformation &tsf)
+#ifdef INCOMPLETE
+void Eye::init(Bitmap1 &img)
+{
+    const float max_distance = 2 * radius;
+    const int size = 2 * max_distance;
+    Bitmap1 votes(size, size, 0.f);
+    Pixel offset = to_pixel(init_pos) - Pixel(max_distance, max_distance);
+    cv::Rect region(offset, size(votes));
+    Bitmap1 dx = img.d(D::X)(region), 
+    for (int i=0; i<size; i++) {
+        for (int j=0; j<size; j++) {
+            
+        }
+    }
+}
+#endif
+
+void Eye::refit(const Bitmap3 &img, const Transformation &tsf)
 {
     const int iteration_count = 20;
     const float max_distance = 2 * radius;
@@ -150,7 +171,10 @@ void Eye::refit(Image &img, const Transformation &tsf)
     }
     for (int iteration=0; iteration < iteration_count; iteration++) {
         float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));
-        Vector2 delta_pos = {sum_boundary_dp(img.d(D::XX), img.d(D::XY), tsf), sum_boundary_dp(img.d(D::XY), img.d(D::YY), tsf)};
+        Pixel tsf_pos = to_pixel(tsf(pos));
+        Rect bounds(tsf_pos - Pixel(radius, radius), tsf_pos + Pixel(radius, radius));
+        Bitmap22 gradgrad = gradient(gradient(grayscale(img, bounds)));
+        Vector2 delta_pos = {sum_boundary_dp(gradgrad, 0, tsf), sum_boundary_dp(gradgrad, 1, tsf)};
         //float delta_radius = sum_boundary_dr(img, tsf);
         float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1])/*, std::abs(delta_radius)*/, 1e-5f});
         //printf("step %g * (move %g, %g; radius %g)\n", step, delta_pos[0], delta_pos[1], delta_radius);
@@ -160,28 +184,28 @@ void Eye::refit(Image &img, const Transformation &tsf)
     }
 }
 
-float Eye::sum_boundary_dp(const Bitmap3 &img_x, const Bitmap3 &img_y, const Transformation &tsf)
+float Eye::sum_boundary_dp(const Bitmap22 &img, int direction, const Transformation &tsf)
 {
-    assert (not img_x.empty());
-    assert (not img_y.empty());
     Vector2 center = tsf(pos);
     /// @todo use derivative of tsf wrt. x, y
     float scale = 1;
     float result = 0;
     float sum_weight = 0;
-    for (Pixel p : region(tsf) & Iterrect(img_x) & Iterrect(img_y)) {
+    for (Pixel p : region(tsf) & img.region()) {
         float dist_x = (p.x - center[0]) / scale;
         float dist_y = (p.y - center[1]) / scale;
         float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - radius);
         if (w > 0) {
-            result += w * cv::sum(img_x(p) * dist_x + img_y(p) * dist_y)[0] / radius;
+            const Matrix22 &value = img(p);
+            result += w * (value(0, direction) * dist_x + value(1, direction) * dist_y) / radius;
             sum_weight += w;
         }
     }
     return sum_weight > 0 ? result / sum_weight : 0;
 }
 
-float Eye::sum_boundary_dr(Image &img, const Transformation &tsf)
+#ifdef UNUSED
+float Eye::sum_boundary_dr(const Bitmap1 &img, const Transformation &tsf)
 {
     Vector2 center = tsf(pos);
     /// @todo use derivative of tsf wrt. x, y
@@ -199,6 +223,7 @@ float Eye::sum_boundary_dr(Image &img, const Transformation &tsf)
     }
     return sum_weight > 0 ? result / sum_weight : 0;
 }
+#endif
 
 Iterrect Eye::region(const Transformation &tsf) const
 {

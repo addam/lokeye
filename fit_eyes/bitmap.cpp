@@ -15,7 +15,7 @@ int Bitmap<T>::crop_horizontal(float x) const
 }    
 
 template<typename T>
-Bitmap<T>::Bitmap(DataType data, Pixel offset) : DataType{data}, offset{offset}
+Bitmap<T>::Bitmap(const DataType &data, Pixel offset) : DataType{data}, offset{offset}
 {
 }
 
@@ -33,7 +33,12 @@ Bitmap<T>::Bitmap(Rect region) : DataType{region.size()}, offset{region.tl()}
 }
 
 template<typename T>
-T combine(T x, T y)
+Bitmap<T> Bitmap<T>::clone() const {
+    return Bitmap<T>(static_cast<const DataType&>(*this).clone(), offset);
+}
+
+template<typename T>
+T combine(T x, T y, T w=T())
 {
     throw std::logic_error("not implemented (absurd)");
 }
@@ -43,9 +48,9 @@ Vector2 combine(Vector2 x, Vector2 y)
     return Vector2(x(0), y(0));
 }
 
-Matrix22 combine(Matrix22 x, Matrix22 y)
+Matrix22 combine(Matrix22 xx, Matrix22 xy, Matrix22 yy)
 {
-    return Matrix22(x(0, 0), y(0, 1), x(1, 0), y(1, 1));
+    return Matrix22(xx(0, 0), xy(0, 1), xy(1, 0), yy(1, 1));
 }
 
 Matrix32 combine(Matrix32 x, Matrix32 y)
@@ -54,19 +59,28 @@ Matrix32 combine(Matrix32 x, Matrix32 y)
 }
 
 template<typename T>
-T Bitmap<T>::operator () (Vector2 pos, bool use_half_shift) const
+inline T Bitmap<T>::sample(Vector2 pos) const
 {
-    assert (use_half_shift <= half_shift);
-    if (use_half_shift) {
-        auto &self = *this;
-        return combine(self(pos - Vector2(0.5, 0), false), self(pos - Vector2(0, 0.5), false));
-    } else {
-        float x = pos(0) - offset.x, y = pos(1) - offset.y;
-        const T* top = DataType::template ptr<T>(crop_vertical(std::floor(y)));
-        const T* bottom = DataType::template ptr<T>(crop_vertical(std::ceil(y)));
-        int left = crop_horizontal(std::floor(x)), right = crop_horizontal(std::ceil(x));
-        float tb = y - int(y), lr = x - int(x);
-        return (1 - tb) * ((1 - lr) * top[left] + lr * top[right]) + tb * ((1 - lr) * bottom[left] + lr * bottom[right]);
+    float x = pos(0) - offset.x, y = pos(1) - offset.y;
+    const T* top = DataType::template ptr<T>(crop_vertical(std::floor(y)));
+    const T* bottom = DataType::template ptr<T>(crop_vertical(std::ceil(y)));
+    int left = crop_horizontal(std::floor(x)), right = crop_horizontal(std::ceil(x));
+    float tb = y - int(y), lr = x - int(x);
+    return (1 - tb) * ((1 - lr) * top[left] + lr * top[right]) + tb * ((1 - lr) * bottom[left] + lr * bottom[right]);
+}
+
+template<typename T>
+T Bitmap<T>::operator () (Vector2 pos) const
+{
+    switch (halfpixels) {
+    case 0:
+        return sample(pos);
+    case 1:
+        return combine(sample(pos - Vector2(0.5, 0)), sample(pos - Vector2(0, 0.5)));
+    case 2:
+        return combine(sample(pos - Vector2(1, 0)), sample(pos - Vector2(0.5, 0.5)), sample(pos - Vector2(0, 1)));
+    default:
+        throw std::logic_error("higher derivatives not implemented");
     }
 }
 
@@ -152,12 +166,12 @@ R gradient(const T &src, Rect region)
     const Pixel delta[] = {{1, 0}, {0, 1}};
     region.width -= 1;
     region.height -= 1;
-    if (T::half_shift) {
+    if (T::halfpixels % 2) {
         region.x += 1;
         region.y += 1;
     }
     R result(region);
-    //static_assert (R::half_shift != T::half_shift, "gradient must cause halfpixel shift");
+    static_assert (R::halfpixels == T::halfpixels + 1, "gradient must cause halfpixel shift");
     for (Pixel p : Iterrect(region)) {
         for (int i=0; i<N; i++) {
             for (int j=0; j<M; j++) {
@@ -195,11 +209,11 @@ Bitmap1 grayscale(const Bitmap3 &src, Rect region)
     return result;
 }
 
-template<> const bool Bitmap1::half_shift = false;
-template<> const bool Bitmap2::half_shift = true;
-template<> const bool Bitmap3::half_shift = false;
-template<> const bool Bitmap22::half_shift = true;
-template<> const bool Bitmap32::half_shift = true;
+template<> const int Bitmap1::halfpixels = 0;
+template<> const int Bitmap2::halfpixels = 1;
+template<> const int Bitmap3::halfpixels = 0;
+template<> const int Bitmap22::halfpixels = 2;
+template<> const int Bitmap32::halfpixels = 1;
 
 template class Bitmap<float>;
 template class Bitmap<Vector2>;

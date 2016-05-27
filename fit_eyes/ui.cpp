@@ -1,4 +1,6 @@
 #include "main.h"
+#include "bitmap.h"
+#include "optimization.h"
 #include <vector>
 #include <iostream>
 const char winname[] = "fit eyes";
@@ -14,7 +16,7 @@ struct State
     std::vector<Eye> eyes;
     bool has_rectangle = false;
     bool pressed = false;
-    State(const char *winname, const Image &img) : winname{winname}, canvas{img.data} {
+    State(const char *winname, const Bitmap3 &img) : winname{winname}, canvas{img} {
         cv::namedWindow(winname);
         cv::setMouseCallback(winname, onMouse, this);
         cv::imshow(winname, canvas);
@@ -64,7 +66,7 @@ void onMouse(int event, int x, int y, int, void* param)
 
 }
 
-Face mark_eyes(Image &img)
+Face mark_eyes(Bitmap3 &img)
 {
     State state(winname, img);
     do {
@@ -76,8 +78,8 @@ Face mark_eyes(Image &img)
     return result;
 }
 
-void Face::render(const Image &image) const {
-    Bitmap3 result = image.data.clone();
+void Face::render(const Bitmap3 &image) const {
+    Bitmap3 result = image.clone();
     std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
     std::for_each(vertices.begin(), vertices.end(), [this](Vector2 &v) { v = tsf(v); });
     for (int i = 0; i < 4; i++) {
@@ -100,15 +102,14 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
     const char winname[] = "calibrate";
     const Vector3 bgcolor(0.7, 0.6, 0.5);
     std::vector<std::pair<Vector2, Vector2>> measurements;
-    Bitmap3 canvas(window_size.y, window_size.x);
-    canvas = bgcolor;
+    Bitmap3 canvas(window_size.y, window_size.x, bgcolor);
     cv::namedWindow(winname);
     cv::imshow(winname, canvas);
     Vector2 cell(window_size.x / divisions, window_size.y / divisions);
     std::random_device rd;
     std::mt19937 generator(rd());
     std::uniform_real_distribution<> urand(0, 1);
-    std::pair<Image, Vector2> task;
+    std::pair<Bitmap3, Vector2> task;
     while (1) {
         std::vector<Vector2> points;
         for (int i=0; i<divisions; i++) {
@@ -122,7 +123,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             cv::circle(canvas, to_pixel(point), 50, cv::Scalar(0, 0.6, 1), -1);
             cv::circle(canvas, to_pixel(point), 5, cv::Scalar(0, 0, 0.3), -1);
             cv::imshow(winname, canvas);
-            if (not task.first.data.empty()) {
+            if (not task.first.empty()) {
                 face.refit(task.first);
                 face.render(task.first);
                 measurements.emplace_back(std::make_pair(face(), task.second));
