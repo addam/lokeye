@@ -26,7 +26,7 @@ public:
     
     bool read(VideoCapture &cap);
 
-    Rect region() const;
+    Iterrect region() const;
 };
 
 using Bitmap1 = Bitmap<float>;

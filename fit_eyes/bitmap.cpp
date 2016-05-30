@@ -3,15 +3,17 @@
 template<typename T>
 int Bitmap<T>::crop_vertical(float y) const
 {
-    const float bottom = offset.y + DataType::rows;
-    return (y < bottom) ? (y < offset.y) ? offset.y : int(y) : bottom;
+    const float top = offset.y + 0.5 * halfpixels;
+    const float bottom = top + DataType::rows - halfpixels;
+    return (y < bottom) ? (y < top) ? top : int(y) : bottom;
 }
 
 template<typename T>
 int Bitmap<T>::crop_horizontal(float x) const
 {
-    const float right = offset.x + DataType::cols;
-    return (x < right) ? (x < offset.x) ? offset.x : int(x) : right;
+    const float left = offset.x + 0.5 * halfpixels;
+    const float right = left + DataType::cols - halfpixels;
+    return (x < right) ? (x < left) ? left : int(x) : right;
 }    
 
 template<typename T>
@@ -62,9 +64,9 @@ template<typename T>
 inline T Bitmap<T>::sample(Vector2 pos) const
 {
     float x = pos(0) - offset.x, y = pos(1) - offset.y;
-    const T* top = DataType::template ptr<T>(crop_vertical(std::floor(y)));
-    const T* bottom = DataType::template ptr<T>(crop_vertical(std::ceil(y)));
-    int left = crop_horizontal(std::floor(x)), right = crop_horizontal(std::ceil(x));
+    const T* top = DataType::template ptr<T>(crop_vertical(y));
+    const T* bottom = DataType::template ptr<T>(crop_vertical(y + 1));
+    int left = crop_horizontal(x), right = crop_horizontal(x + 1);
     float tb = y - int(y), lr = x - int(x);
     return (1 - tb) * ((1 - lr) * top[left] + lr * top[right]) + tb * ((1 - lr) * bottom[left] + lr * bottom[right]);
 }
@@ -97,9 +99,9 @@ T& Bitmap<T>::operator () (Pixel pos)
 }
     
 template<typename T>
-Rect Bitmap<T>::region() const
+Iterrect Bitmap<T>::region() const
 {
-    return Rect{offset, DataType::size()};
+    return Rect(offset, DataType::size());
 }
 
 template<>
@@ -159,24 +161,17 @@ const float& elem(const float &matrix, int i, int j)
     return matrix;
 }
 
-template<int N, int M, typename T, typename R>
+template<int N, typename T, typename R>
 R gradient(const T &src, Rect region)
 {
     init_region(region, src);
-    const Pixel delta[] = {{1, 0}, {0, 1}};
-    region.width -= 1;
-    region.height -= 1;
-    if (T::halfpixels % 2) {
-        region.x += 1;
-        region.y += 1;
-    }
     R result(region);
     static_assert (R::halfpixels == T::halfpixels + 1, "gradient must cause halfpixel shift");
     for (Pixel p : Iterrect(region)) {
         for (int i=0; i<N; i++) {
-            for (int j=0; j<M; j++) {
-                elem(result(p), i, j) = elem(src(p + delta[j]), i, 0) - elem(src(p), i, 0);
-            }
+            Pixel dx = {1, 0}, dy = {0, 1};
+            elem(result(p), i, 0) = (p.x + 1 < region.br().x) ? elem(src(p + dx), i, 0) - elem(src(p), i, 0) : 0;
+            elem(result(p), i, 1) = (p.y + 1 < region.br().y) ? elem(src(p + dy), i, 1) - elem(src(p), i, 1) : 0;
         }
     }
     return result;
@@ -184,17 +179,17 @@ R gradient(const T &src, Rect region)
 
 Bitmap32 gradient(const Bitmap3 &src, Rect region)
 {
-    return gradient<3, 2, Bitmap3, Bitmap32>(src, region);
+    return gradient<3, Bitmap3, Bitmap32>(src, region);
 }
 
 Bitmap2 gradient(const Bitmap1 &src, Rect region)
 {
-    return gradient<1, 2, Bitmap1, Bitmap2>(src, region);
+    return gradient<1, Bitmap1, Bitmap2>(src, region);
 }
 
 Bitmap22 gradient(const Bitmap2 &src, Rect region)
 {
-    return gradient<2, 2, Bitmap2, Bitmap22>(src, region);
+    return gradient<2, Bitmap2, Bitmap22>(src, region);
 }
 
 Bitmap1 grayscale(const Bitmap3 &src, Rect region)
