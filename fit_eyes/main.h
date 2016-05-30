@@ -38,53 +38,6 @@ inline float pow2(float x)
     return x*x;
 }
 
-struct Iterrect : public Rect {
-    Iterrect(const Rect &rect) : Rect{rect} {
-    }
-    Iterrect operator & (const Iterrect &other) const {
-        return Iterrect(static_cast<const Rect&>(*this) & static_cast<const Rect&>(other));
-    }
-    Iterrect operator & (const Rect &other) const {
-        return Iterrect(static_cast<const Rect&>(*this) & other);
-    }
-    struct Iterator : public Pixel {
-        int left, right;
-        Iterator(const Pixel &p, int right) : Pixel{p}, left{p.x}, right{right} {
-        }
-        Pixel& operator *() {
-            return *this;
-        }
-        bool operator != (const Iterator &other) const {
-            return y != other.y or x != other.x;
-        }
-        Iterator& operator++() {
-            if (++x >= right) {
-                x = left;
-                y ++;
-            }
-            return *this;
-        }
-    };
-    Iterator begin() const {
-        return Iterator{tl(), br().x};
-    }
-    Iterator end() const {
-        return Iterator{{tl().x, br().y}, br().x};
-    }
-    bool contains(Vector2 v) const {
-        return Rect::contains(to_pixel(v));
-    }
-    template<typename Func, typename T>
-    T max(Func f, T init) const {
-        const Pixel corners[] = {{x, y}, {x+width, y}, {x, y+height}, {x+width, y+height}};
-        for (Pixel p : corners) {
-            T val = f(p);
-            init = std::max(init, val);
-        }
-        return init;
-    }
-};
-
 struct Transformation
 {
     using Params = Vector3;

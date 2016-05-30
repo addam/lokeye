@@ -6,38 +6,60 @@
 template<typename T>
 class Bitmap : public cv::Mat_<T>
 {
-    Pixel offset;
     using DataType = cv::Mat_<T>;
-    inline int crop_vertical(float y) const;
-    inline int crop_horizontal(float x) const;
-    inline T sample(Vector2) const;
+    Vector2 offset;
+    Vector2 to_local(Vector2) const;
 public:
-    const static int halfpixels;
-    Bitmap(const DataType &data=DataType(), Pixel offset={0, 0});
-    Bitmap(int rows, int cols, T value, Pixel offset={0, 0});
+    Vector2 to_world(Pixel) const;
+    Bitmap(const DataType &data=DataType(), Vector2 offset={0, 0});
+    Bitmap(int rows, int cols, Vector2 offset={0, 0});
     Bitmap(Rect);
     Bitmap<T> clone() const;
     
     using DataType::operator=;
     
+    /** Access a pixel directly, in the reference frame of this bitmap
+     */
+    using DataType::operator ();
+    
+    /** Sample from this bitmap in world reference frame
+     */
     T operator () (Vector2 pos) const;
-    T& operator () (Pixel pos);
-    const T& operator () (Pixel pos) const;
     
     bool read(VideoCapture &cap);
 
-    Iterrect region() const;
+    Bitmap<T> d(int direction, Rect region=Rect()) const;
+    
+    struct Iterator : public Pixel {
+        int right;
+        Iterator(int right, Pixel init={0, 0}) : Pixel{init}, right{right} {
+        }
+        Pixel& operator *() {
+            return *this;
+        }
+        bool operator != (const Iterator &other) const {
+            return not (other == *this);
+        }
+        Iterator& operator++() {
+            if (++x >= right) {
+                x = 0;
+                ++y;
+            }
+            return *this;
+        }
+    };
+    Iterator begin() const {
+        return Iterator{DataType::cols};
+    }
+    Iterator end() const {
+        return Iterator{DataType::cols, Pixel{0, DataType::rows}};
+    }
 };
 
 using Bitmap1 = Bitmap<float>;
 using Bitmap2 = Bitmap<Vector2>;
 using Bitmap3 = Bitmap<Vector3>;
-using Bitmap22 = Bitmap<Matrix22>;
-using Bitmap32 = Bitmap<Matrix32>;
 
-Bitmap32 gradient(const Bitmap3&, Rect region=Rect());
-Bitmap2 gradient(const Bitmap1&, Rect region=Rect());
-Bitmap22 gradient(const Bitmap2&, Rect region=Rect());
 Bitmap1 grayscale(const Bitmap3&, Rect region=Rect());
 
 #endif
