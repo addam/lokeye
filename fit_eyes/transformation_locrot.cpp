@@ -54,3 +54,8 @@ Transformation Transformation::inverse() const
     Params inverse_params(static_params(0), static_params(1), -params(2));
     return Transformation(inverse_params, inverse_static_params);
 }
+
+Vector2 Transformation::inverse(Vector2 v) const
+{
+    return inverse()(v);
+}

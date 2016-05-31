@@ -16,6 +16,7 @@ struct Eye
     Eye(Vector2 pos, float radius) : pos{pos}, init_pos{pos}, radius{radius} {
     }
     void refit(const Bitmap3&, const Transformation&);
+    void init(const Bitmap3&, const Transformation&);
 protected:
     float sum_boundary_dp(const Bitmap1&, bool is_vertical, const Transformation&);
     #ifdef UNUSED

@@ -156,6 +156,7 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
     }
     Transformation tsf_inv = tsf.inverse();
     for (Eye &eye : eyes) {
+        eye.init(img, tsf_inv);
         eye.refit(img, tsf_inv);
     }
 }
@@ -165,26 +166,48 @@ Vector2 Face::operator () () const
     return eyes[0].pos + eyes[1].pos;
 }
 
-#ifdef INCOMPLETE
-void Eye::init(Bitmap1 &img)
+void cast_vote(Bitmap1 &img, Vector2 v, float weight)
+{
+    Vector2 pos = img.to_local(v);
+    const int left = pos(0), right = left + 1, y = pos(1);
+    if (left < 0 or right >= img.cols or y < 0 or y >= img.rows) {
+        return;
+    }
+    float* row = img.ptr<float>(y);
+    const float lr = pos(0) - left;
+    row[left] += weight * (1 - lr);
+    row[right] += weight * lr;
+}
+
+void Eye::init(const Bitmap3 &img, const Transformation &tsf)
 {
     const float max_distance = 2 * radius;
     const int size = 2 * max_distance;
-    Bitmap1 votes(size, size, 0.f);
-    Pixel offset = to_pixel(init_pos) - Pixel(max_distance, max_distance);
-    cv::Rect region(offset, size(votes));
-    Bitmap1 dx = img.d(D::X)(region), 
-    for (int i=0; i<size; i++) {
-        for (int j=0; j<size; j++) {
-            
-        }
+    Region region(tsf(pos) - Vector2(max_distance, max_distance), tsf(pos) + Vector2(max_distance, max_distance));
+    Bitmap1 votes(to_rect(region));
+    votes = 0;
+    Bitmap1 gray = grayscale(img, region);
+    Bitmap1 dx = gray.d(0), dy = gray.d(1);
+    for (Pixel p : dx) {
+        Vector2 v = dx.to_world(p);
+        Vector2 gradient(dx(p), dy(v));
+        float size = cv::norm(gradient);
+        cast_vote(votes, v - gradient * radius / size, size);
     }
+    for (Pixel p : dy) {
+        Vector2 v = dy.to_world(p);
+        Vector2 gradient(dx(v), dy(p));
+        float size = cv::norm(gradient);
+        cast_vote(votes, v - gradient * radius / size, size);
+    }
+    Pixel result;
+    cv::minMaxLoc(votes, NULL, NULL, NULL, &result);
+    pos = tsf.inverse(votes.to_world(result));
 }
-#endif
 
 void Eye::refit(const Bitmap3 &img, const Transformation &tsf)
 {
-    const int iteration_count = 20;
+    const int iteration_count = 5;
     const float max_distance = 2 * radius;
     if (cv::norm(pos - init_pos) > max_distance) {
         pos = init_pos;
