@@ -6,6 +6,7 @@ The program is yet in early development, there are no usable binaries.
 Moreover, it is the cornerstone of my diploma thesis meant for publishing in summer 2016, so please show a bit of scientific ethics when reusing the code.
 
 ## important files
+* `fit_eyes/` contains an implementation of eye and face tracking. The following two files are just old versions of the same code:
 * `transform.cpp` can visualize and rotate a depth-mapped photograph in camera projection.
   It can also evaluate an error metric against reference photo and should minimize this error automatically.
 * `label.cpp` performs a local fitting to circular edges in a photograph.

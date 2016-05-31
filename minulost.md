@@ -104,10 +104,16 @@ Návrh: namísto kalibrace náhodným střílením projít několik bodů na př
 
 Přepsal jsem datovou strukturu pro obrázek, aby byla trochu přehlednější a především, aby mohla pokrývat jen malý výřez snímku, když je to potřeba.
 
+## Květen 2016
+
 Přepsal jsem interpolaci obrázku a derivací prvního a druhého řádu. Bilineární interpolace obrázku je sama o sobě jednoduchá, teoreticky vzato ale vede k nespojité derivaci. Možností se nabízí několik:
  * Úplně to odignorovat, jako všichni ostatní. Derivace se počítají z okolních dvou pixelů (potažmo čtyř v případě dxdy) a interpolovat se nechají zase bilineárně.
- * Datům líp odpovídá, když je první derivace posunutá na půl cesty mezi příslušnými pixely, a obdobně dxdy derivace je ve středu příslušných čtyř pixelů. Z teoretického hlediska to pořád není správně, protože takhle interpolované derivace spojité budou.
+ * Datům líp odpovídá, když je první derivace posunutá na půl cesty mezi příslušnými dvěma pixely, a obdobně dxdy derivace je ve středu příslušných čtyř pixelů. Z teoretického hlediska to pořád není správně: takhle interpolované derivace spojité budou, ale bilineárně interpolovaný obrázek není hladký.
  * Teoreticky správné by bylo obrázek považovat za spojitou funkci a její derivace napočítat analyticky. Nejlákavější je použít Lanczosovu funkci sinc(x) * sinc(x/2); trápí mě ale, že konstantní signál interpolovaný touhle funkcí nezůstane konstantní. Filtrů, které by tuhle podmínku splňovaly a zároveň byly hladké, ale zřejmě není prozkoumaných moc a v praxi se nepoužívají. Jedna možnost je spartánský (cos(x) + 1)/2; po normalizaci na rozsah (-1...1) se ale ukáže, že derivace ve skutečnosti jsou příliš vysoké, že filtr vyrábí hrany navíc.
 Nevím, možná chci něco, co neexisuje. Prozatím si vystačím si bilineární interpolací posunutou o půlpixely (jsem přesvědčený, že na tom záleží). Tohle téma podle mě ale zaslouží v diplomce aspoň stranu textu.
 
 Průzkum, jak správně vyslovovat "Hough", mě navedl na zábavnou diskuzi: https://groups.google.com/forum/#!topic/misc.misc/m31Idr1tWzM
+
+Derivace obrázku jsem nakonec udělal tak, aby šla počítat vždycky jenom v jednom směru (to znamená, nikdy ne celý gradient) a díky tomu aby byla správně posunutá. Předtím jsem se trochu zapeklil v tom, jak se má první a druhá derivace správně posouvat o půlpixely; je v tom systém, ale špatně se reprezentuje v počítači, protože se výsledky liší i ve svých rozměrech, o jeden pixel plus mínus.
+
+Doplnil jsem inicializaci oka Houghovou transformací (kružnice se známým poloměrem). Když uživatel nehýbe hlavou, sledování očí teď dává výsledky přesné tak na 50 až 100 pixelů, podle toho, jak kalibrace vyjde. Zjevně to ale funguje. Otáčení hlavou má na výsledky předvidatelný, ale naprosto ničivý vliv.
