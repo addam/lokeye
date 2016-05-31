@@ -117,26 +117,46 @@ Vector2 Gaze::operator () (Vector2 v) const
     return {h(0) / h(2), h(1) / h(2)};
 }
 
+float step_length(Vector3 step, Region r, const Transformation &tsf)
+{
+    Transformation inv = tsf.inverse();
+    Vector2 points[] = {to_vector(r.tl()), Vector2(r.tl().x, r.br().y), to_vector(r.br()), Vector2(r.br().x, r.tl().y)};
+    float result = 1e-5;
+    for (Vector2 v : points) {
+        for (int i=0; i<2; i++) {
+            result = std::max(result, std::abs(tsf.d(inv(v), i).dot(step)));
+        }
+    }
+    return result;
+}
+
 void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
     if (not only_eyes) {
-        Iterrect rotregion = tsf.inverse()(region);
-        Bitmap<Matrix32> grad = gradient(img, rotregion);
+        Region rotregion = tsf.inverse()(region);
+        assert (rotregion.tl().x >= 0 and rotregion.tl().y >= 0);
+        assert (rotregion.br().x <= img.cols and rotregion.br().y <= img.rows);
+        Bitmap3 gradient[] = {img.d(0, rotregion), img.d(1, rotregion)};
         for (int iteration=0; iteration < 30; iteration++) {
-            cv::Matx<float, 1, 3> delta_tsf = {0, 0, 0};
-            for (Pixel p : rotregion) {
-                if (region.contains(tsf(p))) {
-                    cv::Matx<float, 3, 1> diff = img(p) - ref(tsf(p));
-                    delta_tsf += diff.t() * grad(p) * tsf.grad(p);
+            Vector3 delta_tsf = {0, 0, 0};
+            // formula : delta_tsf = sum_pixel (img - ref o tsf)^t * gradient(img) * gradient(tsf)
+            for (int direction=0; direction < 2; direction++) {
+                Bitmap3 &grad = gradient[direction];
+                for (Pixel p : grad) {
+                    Vector2 v = grad.to_world(p);
+                    if (region.contains(to_pixel(tsf(v)))) {
+                        Vector3 diff = img(v) - ref(tsf(v));
+                        delta_tsf += diff.dot(grad(p)) * tsf.d(v, direction);
+                    }
                 }
             }
-            float length = region.max([this, delta_tsf](Pixel corner) { return cv::norm(tsf.grad(corner) * delta_tsf.t()); }, 1e-5);
-            //printf("step (%g, %g, %g) / %g\n", grad(0), grad(1), grad(2), length);
-            tsf.params -= (1/length) * delta_tsf.t();
+            float length = step_length(delta_tsf, region, tsf);
+            tsf.params += (1/length) * delta_tsf;
         }
     }
+    Transformation tsf_inv = tsf.inverse();
     for (Eye &eye : eyes) {
-        eye.refit(img, tsf);
+        eye.refit(img, tsf_inv);
     }
 }
 
@@ -169,12 +189,14 @@ void Eye::refit(const Bitmap3 &img, const Transformation &tsf)
     if (cv::norm(pos - init_pos) > max_distance) {
         pos = init_pos;
     }
+    Pixel tsf_pos = to_pixel(tsf(pos));
+    const int margin = std::min(int(max_distance), iteration_count) + radius;
+    Rect bounds(tsf_pos - Pixel(1, 1) * margin, tsf_pos + Pixel(1, 1) * margin);
+    Bitmap1 gray = grayscale(img, bounds);
+    Bitmap1 dxx = gray.d(0).d(0), dxy = gray.d(0).d(1), dyy = gray.d(1).d(1);
     for (int iteration=0; iteration < iteration_count; iteration++) {
         float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));
-        Pixel tsf_pos = to_pixel(tsf(pos));
-        Rect bounds(tsf_pos - Pixel(radius, radius), tsf_pos + Pixel(radius, radius));
-        Bitmap22 gradgrad = gradient(gradient(grayscale(img, bounds)));
-        Vector2 delta_pos = {sum_boundary_dp(gradgrad, 0, tsf), sum_boundary_dp(gradgrad, 1, tsf)};
+        Vector2 delta_pos = {sum_boundary_dp(dxx, false, tsf) + sum_boundary_dp(dxy, true, tsf), sum_boundary_dp(dxy, false, tsf) + sum_boundary_dp(dyy, true, tsf)};
         //float delta_radius = sum_boundary_dr(img, tsf);
         float step = 1. / std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1])/*, std::abs(delta_radius)*/, 1e-5f});
         //printf("step %g * (move %g, %g; radius %g)\n", step, delta_pos[0], delta_pos[1], delta_radius);
@@ -184,20 +206,18 @@ void Eye::refit(const Bitmap3 &img, const Transformation &tsf)
     }
 }
 
-float Eye::sum_boundary_dp(const Bitmap22 &img, int direction, const Transformation &tsf)
+float Eye::sum_boundary_dp(const Bitmap1 &derivative, bool is_vertical, const Transformation &tsf)
 {
     Vector2 center = tsf(pos);
-    /// @todo use derivative of tsf wrt. x, y
+    /// @todo use derivative of tsf wrt. x, y for distortion into ellipse
     float scale = 1;
     float result = 0;
     float sum_weight = 0;
-    for (Pixel p : region(tsf) & img.region()) {
-        float dist_x = (p.x - center[0]) / scale;
-        float dist_y = (p.y - center[1]) / scale;
-        float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - radius);
+    for (Pixel p : derivative) {
+        Vector2 offcenter = 1./scale * (derivative.to_world(p) - center);
+        float w = 1 - std::abs(cv::norm(offcenter) - radius);
         if (w > 0) {
-            const Matrix22 &value = img(p);
-            result += w * (value(0, direction) * dist_x + value(1, direction) * dist_y) / radius;
+            result += w * (derivative(p) * offcenter(is_vertical ? 1 : 0)) / radius;
             sum_weight += w;
         }
     }
@@ -223,12 +243,12 @@ float Eye::sum_boundary_dr(const Bitmap1 &img, const Transformation &tsf)
     }
     return sum_weight > 0 ? result / sum_weight : 0;
 }
-#endif
 
-Iterrect Eye::region(const Transformation &tsf) const
+Region Eye::region(const Transformation &tsf) const
 {
     Vector2 center = tsf(pos);
     /// @todo use derivative of tsf wrt. x, y
     float scale = 1;
     return Rect(center[0] - radius * scale, center[1] - radius * scale, 2 * radius * scale + 2, 2 * radius * scale + 2);
 }
+#endif

@@ -8,9 +8,11 @@ class Bitmap : public cv::Mat_<T>
 {
     using DataType = cv::Mat_<T>;
     Vector2 offset;
-    Vector2 to_local(Vector2) const;
 public:
+    Vector2 to_local(Vector2) const;
     Vector2 to_world(Pixel) const;
+    Region to_local(Region) const;
+    Region to_world(Rect) const;
     Bitmap(const DataType &data=DataType(), Vector2 offset={0, 0});
     Bitmap(int rows, int cols, Vector2 offset={0, 0});
     Bitmap(Rect);
@@ -28,7 +30,8 @@ public:
     
     bool read(VideoCapture &cap);
 
-    Bitmap<T> d(int direction, Rect region=Rect()) const;
+    Bitmap<T> d(int direction, Rect rect=Rect()) const;
+    Bitmap<T> d(int direction, Region) const;
     
     struct Iterator : public Pixel {
         int right;
@@ -60,6 +63,7 @@ using Bitmap1 = Bitmap<float>;
 using Bitmap2 = Bitmap<Vector2>;
 using Bitmap3 = Bitmap<Vector3>;
 
-Bitmap1 grayscale(const Bitmap3&, Rect region=Rect());
+Bitmap1 grayscale(const Bitmap3&, Rect rect=Rect());
+Bitmap1 grayscale(const Bitmap3&, Region);
 
 #endif

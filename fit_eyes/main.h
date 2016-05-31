@@ -17,6 +17,7 @@ using Matrix32 = cv::Matx32f;
 using Matrix33 = cv::Matx33f;
 using cv::VideoCapture;
 using cv::Rect;
+using Region = cv::Rect_<float>;
 using TimePoint = std::chrono::high_resolution_clock::time_point;
 
 using Color = Vector3;
@@ -33,6 +34,21 @@ inline Vector2 to_vector(Pixel p)
     return Vector2{float(p.x), float(p.y)};
 }
 
+inline Vector2 to_vector(cv::Point_<float> p)
+{
+    return Vector2(p.x, p.y);
+}
+
+inline Region to_region(Rect rect)
+{
+    return Region(to_vector(rect.tl()), to_vector(rect.br()));
+}
+
+inline Rect to_rect(Region region)
+{
+    return Rect(to_pixel(region.tl()), to_pixel(region.br()));
+}
+
 inline float pow2(float x)
 {
     return x*x;
@@ -43,14 +59,15 @@ struct Transformation
     using Params = Vector3;
     const Vector3 static_params;
     Params params;
-    Transformation(Rect region);
+    Transformation(Region region);
     Transformation(Params, Vector3);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
-    Rect operator () (Rect) const;
+    Region operator () (Region) const;
     Transformation inverse() const;
     Matrix23 grad(Vector2) const;
     Matrix23 grad(Pixel p) const { return this->grad(to_vector(p)); }
+    Vector3 d(Vector2, int direction) const;
 };
 
 #endif // MAIN_H

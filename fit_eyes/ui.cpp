@@ -74,19 +74,20 @@ Face mark_eyes(Bitmap3 &img)
             exit(0);
         }
     } while (not state.done());
-    Face result{img, Rect{state.begin, state.end}, state.eyes[0], state.eyes[1]};
+    Face result{img, Region{state.begin, state.end}, state.eyes[0], state.eyes[1]};
     return result;
 }
 
 void Face::render(const Bitmap3 &image) const {
     Bitmap3 result = image.clone();
+    Transformation tsf_inv = tsf.inverse();
     std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
-    std::for_each(vertices.begin(), vertices.end(), [this](Vector2 &v) { v = tsf(v); });
+    std::for_each(vertices.begin(), vertices.end(), [tsf_inv](Vector2 &v) { v = tsf_inv(v); });
     for (int i = 0; i < 4; i++) {
         cv::line(result, to_pixel(vertices[i]), to_pixel(vertices[(i+1)%4]), cv::Scalar(0, 1.0, 1.0));
     }
     for (const Eye &eye : eyes) {
-        cv::circle(result, to_pixel(tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+        cv::circle(result, to_pixel(tsf_inv(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
     }
     const float font_size = 1;
     for (int i=0; i<2; i++) {
@@ -102,7 +103,8 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
     const char winname[] = "calibrate";
     const Vector3 bgcolor(0.7, 0.6, 0.5);
     std::vector<std::pair<Vector2, Vector2>> measurements;
-    Bitmap3 canvas(window_size.y, window_size.x, bgcolor);
+    Bitmap3 canvas(window_size.y, window_size.x);
+    canvas = bgcolor;
     cv::namedWindow(winname);
     cv::imshow(winname, canvas);
     Vector2 cell(window_size.x / divisions, window_size.y / divisions);

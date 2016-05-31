@@ -1,5 +1,5 @@
 #include "main.h"
-Transformation::Transformation(Rect region):
+Transformation::Transformation(Region region):
     static_params(region.x + region.width / 2, region.y + region.height / 2, std::sqrt(pow2(region.width) + pow2(region.height))),
     params(static_params[0], static_params[1], 0)
 {
@@ -25,10 +25,18 @@ Matrix23 Transformation::grad(Vector2 v) const
     return Matrix23{1, 0, coef * (-v[0] * s - v[1] * c), 0, 1, coef * (v[0] * c - v[1] * s)};
 }
 
-Rect Transformation::operator () (Rect rect) const
+Vector3 Transformation::d(Vector2 v, int direction) const
+{
+    float coef = 3.f / static_params[2];
+    float angle = coef * params[2], s = sin(angle), c = cos(angle);
+    v = Vector2(v[0] - static_params[0], v[1] - static_params[1]);
+    return (direction == 0) ? Vector3{1, 0, coef * (-v[0] * s - v[1] * c)} : Vector3{0, 1, coef * (v[0] * c - v[1] * s)};
+}
+
+Region Transformation::operator () (Region region) const
 {
     const Transformation &self = *this;
-    Pixel tl = rect.tl(), br = rect.br(), bl = Pixel(tl.x, br.y), tr = Pixel(br.x, tl.y);
+    Vector2 tl = region.tl(), br = region.br(), bl = {tl(0), br(1)}, tr = {br(0), tl(1)};
     Vector2 points[] = {self(tl), self(tr), self(bl), self(br)};
     Vector2 new_tl = points[0], new_br = points[0];
     for (Vector2 v : points) {
@@ -37,12 +45,12 @@ Rect Transformation::operator () (Rect rect) const
             new_br(i) = std::max(new_br(i), v(i));
         }
     }
-    return Rect(to_pixel(new_tl), to_pixel(new_br));
+    return {new_tl, new_br};
 }
 
 Transformation Transformation::inverse() const
 {
-    Vector3 inverse_static_params(-static_params(0), -static_params(1), static_params(2));
-    Params inverse_params = -params;
+    Vector3 inverse_static_params(params(0), params(1), static_params(2));
+    Params inverse_params(static_params(0), static_params(1), -params(2));
     return Transformation(inverse_params, inverse_static_params);
 }

@@ -22,6 +22,18 @@ Vector2 Bitmap<T>::to_world(Pixel p) const
 }
 
 template<typename T>
+Region Bitmap<T>::to_local(Region r) const
+{
+    return Region(to_local(r.tl()), to_local(r.br()));
+}
+
+template<typename T>
+Region Bitmap<T>::to_world(Rect r) const
+{
+    return Region(to_world(r.tl()), to_world(r.br()));
+}
+
+template<typename T>
 Bitmap<T>::Bitmap(const DataType &data, Vector2 offset) : DataType{data}, offset{offset}
 {
 }
@@ -74,7 +86,7 @@ bool Bitmap3::read(VideoCapture &cap)
 
 
 template<typename T>
-void init_region(Rect &region, T img)
+void init_rect(Rect &region, T img)
 {
     Rect img_region{0, 0, img.cols, img.rows};
     if (region.area() == 0) {
@@ -85,36 +97,47 @@ void init_region(Rect &region, T img)
 }
 
 template<typename T>
-Bitmap<T> Bitmap<T>::d(int direction, Rect region) const
+Bitmap<T> Bitmap<T>::d(int direction, Rect rect) const
 {
-    init_region(region, *this);
-    Vector2 region_offset = to_world(region.tl());
+    init_rect(rect, *this);
+    Vector2 region_offset = to_world(rect.tl());
     if (direction == 0) {
-        region.width -= 1;
+        rect.width -= 1;
         region_offset(0) += 0.5;
     } else if (direction == 1) {
-        region.height -= 1;
+        rect.height -= 1;
         region_offset(1) += 0.5;
     }
     const Bitmap<T> &self = *this;
-    Bitmap<T> result(region.height, region.width, region_offset);
+    Bitmap<T> result(rect.height, rect.width, region_offset);
     const Pixel delta{direction == 0, direction == 1};
     for (Pixel p : result) {
-        result(p) = self(p + region.tl() + delta) - self(p + region.tl());
+        result(p) = self(p + rect.tl() + delta) - self(p + rect.tl());
     }
     return result;
 }
 
-Bitmap1 grayscale(const Bitmap3 &src, Rect region)
+template<typename T>
+Bitmap<T> Bitmap<T>::d(int direction, Region region) const
 {
-    init_region(region, src);
-    Bitmap1 result(region);
+    return this->d(direction, to_rect(to_local(region)));
+}
+    
+Bitmap1 grayscale(const Bitmap3 &src, Rect rect)
+{
+    init_rect(rect, src);
+    Bitmap1 result(rect);
     const Vector3 coef = {0.114, 0.587, 0.299};
     for (Pixel p : result) {
-        const Vector3 val = src(p + region.tl());
+        const Vector3 val = src(p + rect.tl());
         result(p) = val.dot(coef);
     }
     return result;
+}
+
+Bitmap1 grayscale(const Bitmap3 &src, Region region)
+{
+    return grayscale(src, to_rect(src.to_local(region)));
 }
 
 template class Bitmap<float>;

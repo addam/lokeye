@@ -17,18 +17,20 @@ struct Eye
     }
     void refit(const Bitmap3&, const Transformation&);
 protected:
-    float sum_boundary_dp(const Bitmap22&, int direction, const Transformation&);
-    float sum_boundary_dr(const Bitmap22&, const Transformation&);
+    float sum_boundary_dp(const Bitmap1&, bool is_vertical, const Transformation&);
+    #ifdef UNUSED
+    float sum_boundary_dr(const Bitmap1&, const Transformation&);
     Iterrect region(const Transformation&) const;
+    #endif
 };
 
 struct Face
 {
-    Iterrect region;
+    Region region;
     std::array<Eye, 2> eyes;
     Bitmap3 ref;
     Transformation tsf;
-    Face(const Bitmap3 &ref, Rect region, Eye left_eye, Eye right_eye) : ref{ref.clone()}, tsf{region}, region{region}, eyes{left_eye, right_eye} {
+    Face(const Bitmap3 &ref, Region region, Eye left_eye, Eye right_eye) : ref{ref.clone()}, tsf{region}, region{region}, eyes{left_eye, right_eye} {
     }
     void refit(const Bitmap3&, bool only_eyes=false);
     Vector2 operator() () const;

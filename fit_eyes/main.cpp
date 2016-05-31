@@ -1,5 +1,7 @@
 #include <iostream>
 #include "main.h"
+#include "bitmap.h"
+#include "optimization.h"
 
 bool inside(Vector2 pos, Pixel size)
 {
@@ -8,7 +10,7 @@ bool inside(Vector2 pos, Pixel size)
 
 int main(int argc, char** argv)
 {
-    Image reference_image;
+    Bitmap3 reference_image;
     VideoCapture cam = (argc > 1) ? VideoCapture{argv[1]} : VideoCapture{0};
     for (int i=0; i<10; i++) {
         reference_image.read(cam);
@@ -17,11 +19,11 @@ int main(int argc, char** argv)
     Pixel size(1400, 700);
     Gaze fit = calibrate(state, cam, size);
     const Vector3 bg_color(0.4, 0.3, 0.3);
-    Bitmap3 record(size.y, size.x, bg_color);
-    Image image;
+    Bitmap3 record(size.y, size.x);
+    record = bg_color;
+    Bitmap3 image;
     Vector2 prev_pos(-1, -1);
     for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
-        //cv::waitKey();
         state.refit(image);
         Vector2 pos = fit(state());
         std::cout << "position: " << pos(0) << ", " << pos(1) << std::endl;
