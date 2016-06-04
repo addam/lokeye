@@ -117,3 +117,5 @@ Průzkum, jak správně vyslovovat "Hough", mě navedl na zábavnou diskuzi: htt
 Derivace obrázku jsem nakonec udělal tak, aby šla počítat vždycky jenom v jednom směru (to znamená, nikdy ne celý gradient) a díky tomu aby byla správně posunutá. Předtím jsem se trochu zapeklil v tom, jak se má první a druhá derivace správně posouvat o půlpixely; je v tom systém, ale špatně se reprezentuje v počítači, protože se výsledky liší i ve svých rozměrech, o jeden pixel plus mínus.
 
 Doplnil jsem inicializaci oka Houghovou transformací (kružnice se známým poloměrem). Když uživatel nehýbe hlavou, sledování očí teď dává výsledky přesné tak na 50 až 100 pixelů, podle toho, jak kalibrace vyjde. Zjevně to ale funguje. Otáčení hlavou má na výsledky předvidatelný, ale naprosto ničivý vliv.
+
+Na letošním Siggraph byl podrobný tracker hlavy (včetně výrazu tváře) a očí: https://youtu.be/9O95A-3Ocbw (-> přečíst).

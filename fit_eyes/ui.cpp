@@ -132,7 +132,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             const int necessary_support = divisions * divisions;
             if (measurements.size() >= necessary_support) {
                 int support;
-                Gaze result(measurements, support, 100);
+                Gaze result(measurements, support, 50);
                 if (support >= necessary_support) {
                     cv::destroyWindow(winname);
                     for (auto pair : measurements) {

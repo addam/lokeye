@@ -167,7 +167,7 @@ Vector2 Face::operator () () const
     return eyes[0].pos + eyes[1].pos;
 }
 
-void cast_vote(Bitmap1 &img, Vector2 v, float weight)
+inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
 {
     Vector2 pos = img.to_local(v);
     const int left = pos(0), right = left + 1, y = pos(1);
