@@ -84,7 +84,7 @@ float combinations_ratio(int count_total, int count_good)
 {
     const float logp = -2;
     float result = logp / std::log(1 - pow2(pow2(count_good / float(count_total))));
-    printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
+    //printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
     return result;
 }
 
@@ -117,6 +117,23 @@ Vector2 Gaze::operator () (Vector2 v) const
     return {h(0) / h(2), h(1) / h(2)};
 }
 
+Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction)
+{
+    Vector3 result = {0, 0, 0};
+    /// @todo derivative should increase with scale (maybe implement elsewhere)
+    // formula : delta_tsf = sum_pixel (img o tsf - ref)^t * gradient(img) * gradient(tsf)
+    Transformation tsf_inv = tsf.inverse();
+    for (Pixel p : grad) {
+        Vector2 v = grad.to_world(p), refv = tsf_inv(v);
+        if (region.contains(to_pixel(refv))) {
+            Vector3 diff = img(v) - reference(refv);
+            result += diff.dot(grad(p)) * tsf.d(refv, direction);
+        }
+    }
+    Pixel b = *(grad.begin());
+    return result;
+}
+
 float step_length(Vector3 step, Region r, const Transformation &tsf)
 {
     Vector2 points[] = {to_vector(r.tl()), Vector2(r.tl().x, r.br().y), to_vector(r.br()), Vector2(r.br().x, r.tl().y)};
@@ -131,29 +148,25 @@ float step_length(Vector3 step, Region r, const Transformation &tsf)
 
 void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
-    const int iteration_count = 30;
     if (not only_eyes) {
+        const int min_size = 20;
+        const int iteration_count = 3;
         Region rotregion = tsf(region);
-        assert (rotregion.tl().x >= 0 and rotregion.tl().y >= 0);
-        assert (rotregion.br().x <= img.cols and rotregion.br().y <= img.rows);
-        Bitmap3 gradient[] = {img.d(0, rotregion), img.d(1, rotregion)};
-        for (int iteration=0; iteration < iteration_count; iteration++) {
-            Vector3 delta_tsf = {0, 0, 0};
-            // formula : delta_tsf = sum_pixel (img o tsf - ref)^t * gradient(img) * gradient(tsf)
-            Transformation tsf_inv = tsf.inverse();
-            for (int direction=0; direction < 2; direction++) {
-                Bitmap3 &grad = gradient[direction];
-                for (Pixel p : grad) {
-                    Vector2 v = grad.to_world(p), refv = tsf_inv(v);
-                    if (region.contains(to_pixel(refv))) {
-                        Vector3 diff = img(v) - ref(refv);
-                        delta_tsf += diff.dot(grad(p)) * tsf.d(refv, direction);
-                    }
-                }
+        std::vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
+        while (pyramid.back().second.rows > min_size and pyramid.back().second.cols > min_size) {
+            auto &pair = pyramid.back();
+            pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
+        }
+        while (not pyramid.empty()) {
+            auto &pair = pyramid.back();
+            Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
+            for (int iteration=0; iteration < iteration_count; ++iteration) {
+                Vector3 delta_tsf = update_step(pair.first, dx, pair.second, 0) + update_step(pair.first, dy, pair.second, 1);
+                float length = step_length(delta_tsf, rotregion, tsf);
+                tsf.params -= ((1 << pyramid.size())/length) * delta_tsf;
+                //printf("process (%i, %i) / %g results in (%g, %g, %g) / %g\n", pyramid.back().cols, pyramid.back().rows, pyramid.back().scale, delta_tsf(0), delta_tsf(1), delta_tsf(2), length);
             }
-            float length = step_length(delta_tsf, rotregion, tsf);
-            //printf("face step (%g, %g, %g) / %g\n", delta_tsf(0), delta_tsf(1), delta_tsf(2), length);
-            tsf.params -= (1/length) * delta_tsf;
+            pyramid.pop_back();
         }
     }
     for (Eye &eye : eyes) {
@@ -187,7 +200,7 @@ void Eye::init(const Bitmap3 &img, const Transformation &tsf)
     Region region(tsf(init_pos) - Vector2(max_distance, max_distance), tsf(pos) + Vector2(max_distance, max_distance));
     Bitmap1 votes(to_rect(region));
     votes = 0;
-    Bitmap1 gray = grayscale(img, region);
+    Bitmap1 gray = img.grayscale(region);
     Bitmap1 dx = gray.d(0), dy = gray.d(1);
     for (Pixel p : dx) {
         Vector2 v = dx.to_world(p);
@@ -217,7 +230,7 @@ void Eye::refit(const Bitmap3 &img, const Transformation &tsf)
     Transformation tsf_inv = tsf.inverse();
     const int margin = std::min(int(max_distance), iteration_count) + radius;
     Rect bounds(tsf_pos - Pixel(1, 1) * margin, tsf_pos + Pixel(1, 1) * margin);
-    Bitmap1 gray = grayscale(img, bounds);
+    Bitmap1 gray = img.grayscale(bounds);
     Bitmap1 dxx = gray.d(0).d(0), dxy = gray.d(0).d(1), dyy = gray.d(1).d(1);
     for (int iteration=0; iteration < iteration_count; iteration++) {
         float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));

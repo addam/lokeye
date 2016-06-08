@@ -106,6 +106,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
     canvas = bgcolor;
     cv::namedWindow(winname);
     cv::imshow(winname, canvas);
+    cv::waitKey(2000);
     Vector2 cell(window_size.x / divisions, window_size.y / divisions);
     std::random_device rd;
     std::mt19937 generator(rd());
@@ -132,11 +133,12 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             const int necessary_support = divisions * divisions;
             if (measurements.size() >= necessary_support) {
                 int support;
-                Gaze result(measurements, support, 50);
+                const float precision = 50;
+                Gaze result(measurements, support, precision);
                 if (support >= necessary_support) {
                     cv::destroyWindow(winname);
                     for (auto pair : measurements) {
-                        std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << std::endl;
+                        std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << ((cv::norm(result(pair.first) - pair.second) < precision) ? " INLIER" : " out") << std::endl;
                     }
                     return result;
                 }
