@@ -119,3 +119,7 @@ Derivace obrázku jsem nakonec udělal tak, aby šla počítat vždycky jenom v 
 Doplnil jsem inicializaci oka Houghovou transformací (kružnice se známým poloměrem). Když uživatel nehýbe hlavou, sledování očí teď dává výsledky přesné tak na 50 až 100 pixelů, podle toho, jak kalibrace vyjde. Zjevně to ale funguje. Otáčení hlavou má na výsledky předvidatelný, ale naprosto ničivý vliv.
 
 Na letošním Siggraph byl podrobný tracker hlavy (včetně výrazu tváře) a očí: https://youtu.be/9O95A-3Ocbw (-> přečíst).
+
+## Červen 2016
+
+Přepsal jsem hledání obličeje tak, aby jednou prošlo obrazovou pyramidu. Zásadní zjištění je, že výpočet brutálně divergoval, když gradient nebyl správně posunutý o půlpixely; po šestnáctinásobném zmenšení znamená ten půlpixel už v původním obrázku obrovský posuv. Program teď stíhá zpracovat asi 4 snímky za vteřinu.
