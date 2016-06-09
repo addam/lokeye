@@ -1,23 +1,24 @@
 # Aktuální plán a TODO list
 
-poslední změna: 8. června
+poslední změna: 9. června
 
-## Hledání oblasti očí ve snímku
-Máme referenční obrázek (barevný) s vyznačeným obdélníkem, co hledat. Iterativně upravujeme plošnou transformaci obdélníka tak, aby se co nejlíp shodoval s aktuálním snímkem kamery. Těsné okolí očí je z optimalizace vynechané, aby zorničky nerušily.
+## Optimalizaci nechat na knihovně Ceres
+Ceres nabízí několik klasických algoritmů pro nelineární optimalizaci. Derivace si počítá sama, a to zčásti už během kompilace. Docela jistě prospěje přesnosti výpočtu, namísto metody největšího spádu s krokem pevné délky, jak ho používám teď.
 
-## Hledání očí ve snímku
-Tušíme, kde oči jsou, a chceme je obě najít přesně. Výpočet už vlastně fungoval, tak stačí totéž zprovoznit pro video, a to nejlíp živé.
+## Hledat cíleně vnitřní koutky očí
+Porovnávání pohybu očí oproti celému obličeji je nesmírně nepřesné, když se uživatel začne divně tvářit. Z vlastního pozorování před zrcadlem vyplývá, že vnitřní koutky očí jsou docela pevně fixované na lebku (do textu diplomky opatřím podklady z učebnice anatomie). Aby výpočet zvládal prudké pohyby hlavy, hodí se ale celý obličej stejnak najít, jako první krok.
 
-## Odhad směru pohledu
-Máme nějaká trénovací data, známe nějaké naměřené parametry a chceme zjistit, kam se uživatel zrovna dívá. Pro jednoduchost můžeme předpokládat, že vztah mezi pozicí očí a středem zájmu na obrazovce je dvourozměrná projektivita. Trénovací data si program získá tak, že uživateli postupně na různých místech ukazuje fixační značku a sbírá data, dokud nejde přesvědčivě nafitovat zobrazení.
+## Zohlednit víčka
+Program hledá obrys duhovky (angl. limbus) jako kružnici s tmavým vnitřkem. Přitom, i když se uživatel dívá skoro přímo do kamery, je zhruba půlka obrysu zakrytá víčky, a to patrně zkresluje výsledek. Robustnější chybová funkce pro oko by tedy měla na obrysu určit i váhovou funkci, která bude na víčku nulová. Jedno řešení je víčka explicitně modelovat, což by bylo užitečné i pro hledání koutků očí. O něco jednodušší možná bude předpokládat, že obrys duhovky má celý stejnou barvu, tu nějakým způsobem robustně odhadnout a na jejím základě klasifikovat každý pixel jednotlivě.
 
-## Přesný a úsporný výpočet
-Program doteď derivoval obrázek pomocí Sobelova filtru tak, jak ho nabízí knihovna OpenCV. Nešetrné na tom bylo, že se zpracuje vždycky celý snímek; stačí přitom jenom malá oblast obličeje, a druhé derivace pak stačí v ještě menší oblasti kolem očí. Nepřesné je, že Sobelův filtr zabírá 3x3 okolí každého pixelu a detaily v obrázku se tak možná ztratí.
+## Zohlednit natočení hlavy
+Můžeme sice předpokládat, že se uživatel dívá na monitor přímo, ale i malé otočení hlavy má na výsledky obrovský vliv. V neměnném směrovém osvětlení by mohlo stačit otáčení hlavy modelovat jako lineární kombinaci obrázků, na způsob eigenfaces. Rozlišení by mělo být dost hrubé, aby pohyb očí už nebyl vidět.
 
-## Nástřel pomocí Houghovy transformace
-Je možné, že výpočet je akorát příliš nestabilní: vážně to je tak, že zornička každou chvíli uskočí někam stranou a zůstane tak. Navíc tomu škodí, že při kalibraci je pohyb oka dost velký, někdy přes celý monitor. Jako první krok by se tedy měla najít kružnice se známým průměrem, a teprv odtamtud spustit lokální optimalizaci.
+Správnější přístup by byl odhadnout hloubkovou mapu a do modelu hlavy pak přidat ještě vliv optical flow. Při hrubém rozlišení by to mohlo být i docela stabilní. Řešily by se tak problémy s obroučkami brýlí, které akorát překážejí v oblasti u kořene nosu a nepředvídatelným způsobem čouhají do prostoru.
 
-## Výpočet v pyramidě
-Hledání oblasti očí je náramně pomalé a nestabilní, když se pouští na obrázek v plné velikosti; hledání očí naopak potřebuje co nejlepší rozlišení. Proto by bylo určitě rozumné hledat oblast očí v obrazové pyramidě, zatímco oči stačí hledat jenom v nejpodrobnější kvalitě (moc se nehýbou).
+Robustní model natočení celého obličeje by zároveň měl poskytnout odhad toho, jak aktuálně vypadají vnitřní koutky očí. To může hodně prospět přesnosti výpočtu.
 
-Potud hotovo.
+## Deterministická kalibrace
+Aby šlo výpočet předvádět opakovaně s jednou natočeným videem, musí být možné napevno zvoli sekvenci fixací, jaká se ukazuje během kalibrace. Problém je se synchronizací; proto by možná bylo nejlepší údaje o kalibrační sekvenci i s čísly snímku někam uložit. Týž program může uložit i video z kamery, v OpenCV to není problém.
+
+##takový program už by měl bohatě stačit
