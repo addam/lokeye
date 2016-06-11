@@ -106,7 +106,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
     canvas = bgcolor;
     cv::namedWindow(winname);
     cv::imshow(winname, canvas);
-    cv::waitKey(2000);
+    cv::waitKey(5000);
     Vector2 cell(window_size.x / divisions, window_size.y / divisions);
     std::random_device rd;
     std::mt19937 generator(rd());

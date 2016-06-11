@@ -139,9 +139,14 @@ Bitmap<T> Bitmap<T>::downscale() const
 {
     /// @todo do some filtering...
     Bitmap<T> result(DataType::rows / 2, DataType::cols / 2, offset);
-    result.scale = DataType::rows * scale / result.rows;
-    for (Pixel p : result) {
-        result(p) = (*this)(result.to_world(p));
+    result.scale = 2 * scale;
+    result.offset += Vector2(scale, scale);
+    result = 0 * T();
+    for (Pixel s : (*this)) {
+        Pixel d(s.x / 2, s.y / 2);
+        if (d.y < result.rows and d.x < result.cols) {
+            result(d) += (*this)(s);
+        }
     }
     return result;
 }

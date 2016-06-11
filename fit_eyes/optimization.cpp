@@ -120,8 +120,7 @@ Vector2 Gaze::operator () (Vector2 v) const
 Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction)
 {
     Vector3 result = {0, 0, 0};
-    /// @todo derivative should increase with scale (maybe implement elsewhere)
-    // formula : delta_tsf = sum_pixel (img o tsf - ref)^t * gradient(img) * gradient(tsf)
+    // formula : delta_tsf = sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
     Transformation tsf_inv = tsf.inverse();
     for (Pixel p : grad) {
         Vector2 v = grad.to_world(p), refv = tsf_inv(v);
@@ -163,7 +162,7 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
             for (int iteration=0; iteration < iteration_count; ++iteration) {
                 Vector3 delta_tsf = update_step(pair.first, dx, pair.second, 0) + update_step(pair.first, dy, pair.second, 1);
                 float length = step_length(delta_tsf, rotregion, tsf);
-                tsf.params -= ((1 << pyramid.size())/length) * delta_tsf;
+                tsf.params -= ((1 << pyramid.size())/(length * (1 << iteration))) * delta_tsf;
                 //printf("process (%i, %i) / %g results in (%g, %g, %g) / %g\n", pyramid.back().cols, pyramid.back().rows, pyramid.back().scale, delta_tsf(0), delta_tsf(1), delta_tsf(2), length);
             }
             pyramid.pop_back();
