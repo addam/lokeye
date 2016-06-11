@@ -5,6 +5,10 @@ poslední změna: 9. června
 ## Optimalizaci nechat na knihovně Ceres
 Ceres nabízí několik klasických algoritmů pro nelineární optimalizaci. Derivace si počítá sama, a to zčásti už během kompilace. Docela jistě prospěje přesnosti výpočtu, namísto metody největšího spádu s krokem pevné délky, jak ho používám teď.
 
+Neprospěje. Výpočet nefunguje a kód je spíš ošklivější, než byl dřív.
+
+Potud hotovo.
+
 ## Hledat cíleně vnitřní koutky očí
 Porovnávání pohybu očí oproti celému obličeji je nesmírně nepřesné, když se uživatel začne divně tvářit. Z vlastního pozorování před zrcadlem vyplývá, že vnitřní koutky očí jsou docela pevně fixované na lebku (do textu diplomky opatřím podklady z učebnice anatomie). Aby výpočet zvládal prudké pohyby hlavy, hodí se ale celý obličej stejnak najít, jako první krok.
 

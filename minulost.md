@@ -132,3 +132,5 @@ Na letošním Siggraph byl podrobný tracker hlavy (včetně výrazu tváře) a 
 ## Červen 2016
 
 Přepsal jsem hledání obličeje tak, aby jednou prošlo obrazovou pyramidu. Zásadní zjištění je, že výpočet brutálně divergoval, když gradient nebyl správně posunutý o půlpixely; po šestnáctinásobném zmenšení znamená ten půlpixel už v původním obrázku obrovský posuv. Program teď stíhá zpracovat asi 4 snímky za vteřinu.
+
+Zkusil jsem pro optimalizaci použít knihovnu Ceres; měl jsem za to, že bude dávat přesnější výsledky bez námahy, takže by šla použít jako referenční výpočet pro různé budoucí triky. Námahy bylo docela dost, použití na obrazová data vyžaduje alokovat tři wrappery na pixel. Především ale přímočarý KLT tracker nefunguje, s pyramidou ani bez ní. Tenhle plán opouštím a rovnice si budu řešit sám.
