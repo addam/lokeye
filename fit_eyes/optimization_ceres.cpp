@@ -150,10 +150,11 @@ struct LocRot
 
 class ImageWrapper : public ceres::SizedCostFunction<3, 2>
 {
-    Vector3 refc, refdx, refdy;
+    Vector3 refc;
     const Bitmap3 &image;
+    const Bitmap3 &image_dx, &image_dy;
 public:
-    ImageWrapper(const Bitmap3 &image, Vector3 value, Vector3 dx, Vector3 dy);
+    ImageWrapper(const Bitmap3 &image, Vector3 value, const Bitmap3 &dx, const Bitmap3 &dy);
     virtual bool Evaluate(double const* const*, double*, double**) const;
 };
 
@@ -172,7 +173,7 @@ bool LocRot::operator () (const T p[3], const double v[2], T* r) const
 {
     T s = sin(p[2]), c = cos(p[2]);
     r[0] = p[0] + c * v[0] - s * v[1];
-    r[1] = p[2] + s * v[0] + c * v[1];
+    r[1] = p[1] + s * v[0] + c * v[1];
     return true;
 }
 
@@ -192,8 +193,8 @@ void LocRot::copy(const double params[3], Transformation &tsf)
     tsf.params[1] = params[1] - offset[1];
 }
 
-ImageWrapper::ImageWrapper(const Bitmap3 &image, Vector3 value, Vector3 dx, Vector3 dy):
-    image(image), refc(value), refdx(dx), refdy(dy)
+ImageWrapper::ImageWrapper(const Bitmap3 &image, Vector3 value, const Bitmap3 &dx, const Bitmap3 &dy):
+    image(image), refc(value), image_dx(dx), image_dy(dy)
 {
 }
 
@@ -201,11 +202,13 @@ bool ImageWrapper::Evaluate(double const* const* x, double* residual, double** j
 {
     Vector2 v(x[0][0], x[0][1]);
     Vector3 img_color = image(v);
+    Vector3 img_dx = image_dx(v);
+    Vector3 img_dy = image_dy(v);
     for (int i=0; i<3; i++) {
         residual[i] = img_color(i) - refc(i);
         if (jacobian and jacobian[0]) {
-            jacobian[0][2*i + 0] = residual[i] * refdx(i);
-            jacobian[0][2*i + 1] = residual[i] * refdy(i);
+            jacobian[0][2*i + 0] = img_dx(i);
+            jacobian[0][2*i + 1] = img_dy(i);
         }
     }
     return true;
@@ -228,26 +231,35 @@ bool UselessWrapper::operator()(const T* params, T* residual) const
 
 void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
+    using ImgPair = std::pair<Bitmap3, Bitmap3>;
     if (not only_eyes) {
-        Problem problem;
-        Bitmap3 subref = ref(region);
-        Bitmap3 dx = subref.d(0), dy = subref.d(1);
         double params[3];
         LocRot::copy(tsf, params);
-        for (Pixel p : subref) {
-            Vector2 v = subref.to_world(p);
-            // the library requires me to make three allocations per pixel! How the hell is that supposed to be fast?
-            ImageWrapper *w1 = new ImageWrapper(img, subref(p), dx(v), dy(v));
-            UselessWrapper *w2 = new UselessWrapper{w1, v};
-            CostFunction* cost_function = new AutoDiffCostFunction<UselessWrapper, 3, 2>(w2);
-            problem.AddResidualBlock(cost_function, NULL, params);
+        std::vector<ImgPair> pyramid = {std::make_pair(ref(region), img)};
+        while (pyramid.back().first.rows > 4 and pyramid.back().first.cols > 4) {
+            const ImgPair &pair = pyramid.back();
+            pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
         }
-        Solver::Options options;
-        options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-        options.use_nonmonotonic_steps = true;
-        options.minimizer_progress_to_stdout = false;
-        Solver::Summary summary;
-        Solve(options, &problem, &summary);
+        while (not pyramid.empty()) {
+            Problem problem;
+            const ImgPair &pair = pyramid.back();
+            Bitmap3 dx = pair.second.d(0), dy = pair.second.d(1);
+            for (Pixel p : pair.first) {
+                Vector2 v = pair.first.to_world(p);
+                // the library requires me to make three allocations per pixel! How the hell is that supposed to be fast?
+                ImageWrapper *w1 = new ImageWrapper(pair.second, pair.first(p), dx, dy);
+                UselessWrapper *w2 = new UselessWrapper{w1, v};
+                CostFunction* cost_function = new AutoDiffCostFunction<UselessWrapper, 3, 2>(w2);
+                problem.AddResidualBlock(cost_function, NULL, params);
+            }
+            Solver::Options options;
+            options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+            options.use_nonmonotonic_steps = true;
+            options.minimizer_progress_to_stdout = false;
+            Solver::Summary summary;
+            Solve(options, &problem, &summary);
+            pyramid.pop_back();
+        }
         printf("result: %g, %g, %g\n", params[0], params[1], params[2]);
         LocRot::copy(params, tsf);
     }
