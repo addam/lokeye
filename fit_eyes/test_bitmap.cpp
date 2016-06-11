@@ -18,11 +18,12 @@ int main()
     }
     std::cout << "orig data:" << std::endl << gray << std::endl;
     std::cout << "gradient data:" << std::endl << dx << std::endl << "-----" << std::endl << dy << std::endl;
-    std::cout << "jacobian data:" << std::endl << dxx << std::endl << "-----" << std::endl << dxy  << std::endl << "-----" << std::endl << dyx << std::endl << "-----" << dyy << std::endl;
+    std::cout << "hessian data:" << std::endl << dxx << std::endl << "-----" << std::endl << dxy  << std::endl << "-----" << std::endl << dyx << std::endl << "-----" << std::endl << dyy << std::endl;
     Bitmap3 img;
     VideoCapture cam(0);
     img.read(cam);
     Bitmap3 dx_img3 = img.d(0);
     Bitmap3 dy_img3 = img.d(1);
-    gray = grayscale(img);
+    gray = img.grayscale();
+    gray = gray.downscale();
 }
