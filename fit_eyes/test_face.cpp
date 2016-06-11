@@ -2,11 +2,15 @@
 #include "bitmap.h"
 #include "optimization.h"
 #include <iostream>
+#ifdef WITH_CERES
 #include <glog/logging.h>
+#endif
 
 int main(int argc, char** argv)
 {
+    #ifdef WITH_CERES
     google::InitGoogleLogging("face.refit");
+    #endif
     VideoCapture cam{0};
     Bitmap3 image;
     assert (image.read(cam));

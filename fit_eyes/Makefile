@@ -2,9 +2,10 @@ CXX = g++
 OPTIMIZE = -O2 -ffast-math -march=native
 CXXFLAGS = $(OPTIMIZE) -std=c++11 -fopenmp
 
-LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lceres -lglog
+LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
+# -lceres -lglog
 LDFLAGS = $(LIBS) -L/usr/local/lib
-OBJ_OPTIMIZATION = optimization_ceres.o
+OBJ_OPTIMIZATION = optimization.o
 OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) transformation_locrot.o
 BIN = fit_eyes
 
