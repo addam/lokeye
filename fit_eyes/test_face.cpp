@@ -2,9 +2,11 @@
 #include "bitmap.h"
 #include "optimization.h"
 #include <iostream>
+#include <glog/logging.h>
 
 int main(int argc, char** argv)
 {
+    google::InitGoogleLogging("face.refit");
     VideoCapture cam{0};
     Bitmap3 image;
     assert (image.read(cam));

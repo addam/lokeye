@@ -2,9 +2,10 @@ CXX = g++
 OPTIMIZE = -O2 -ffast-math -march=native
 CXXFLAGS = $(OPTIMIZE) -std=c++11 -fopenmp
 
-LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
+LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lceres -lglog
 LDFLAGS = $(LIBS) -L/usr/local/lib
-OBJS = ui.o bitmap.o main.o optimization.o transformation_locrot.o
+OBJ_OPTIMIZATION = optimization_ceres.o
+OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) transformation_locrot.o
 BIN = fit_eyes
 
 all: $(BIN)
@@ -14,14 +15,15 @@ $(BIN): $(OBJS)
 
 test_bitmap: bitmap.o
 test_main: bitmap.o transformation_locrot.o
-test_face: bitmap.o transformation_locrot.o optimization.o ui.o
-
+test_face: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION) ui.o
 test_%: test_%.cpp
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 $(OBJS): %.o: %.cpp main.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+test_ceres optimization_ceres.o: CXXFLAGS += -I/usr/include/eigen3
+ 
 .PHONY: clean
 
 clean:
