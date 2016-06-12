@@ -144,6 +144,10 @@ float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref
     return 0.5 * result;
 }
 
+/** Maximum difference caused by adding 'step' to 'tsf', in pixels
+ * @param step Differential update of the transformation
+ * @param r Region of interest (search domain for the maximum)
+ */
 float step_length(Vector3 step, Region r, const Transformation &tsf)
 {
     Vector2 points[] = {to_vector(r.tl()), Vector2(r.tl().x, r.br().y), to_vector(r.br()), Vector2(r.br().x, r.tl().y)};
@@ -156,21 +160,46 @@ float step_length(Vector3 step, Region r, const Transformation &tsf)
     return result;
 }
 
-float quadratic_minimum(float fx0, float fx1, float df0)
+/** Minimum argument of a quadratic function
+ * function F satisfies: F(0) = f0, F(1) = f1, F'(0) = df0
+ */
+float quadratic_minimum(float f0, float f1, float df0)
 {
-    float second_order = fx0 - fx1 - df0;
+    float second_order = f0 - f1 - df0;
     float minx = -0.5 * df0 / second_order;
     if (second_order < 0) {
         assert (minx < 0);
-        assert (fx1 < fx0);
+        assert (f1 < f0);
     }
     if (minx > 1) {
-        assert(fx1 < fx0);
+        assert(f1 < f0);
     }
     if (second_order < 0 or minx > 1) {
         return 1;
     } else {
         return 0.9 * minx;
+    }
+}
+
+float line_search(Vector3 delta_tsf, float &max_length, float &prev_energy, const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref)
+{
+    const float epsilon = 1e-5;
+    float length = max_length;
+    float current_energy = evaluate(tsf + length * delta_tsf, img, ref);
+    while (1) {
+        float slope = -delta_tsf.dot(delta_tsf) * length;
+        float coef = quadratic_minimum(current_energy, current_energy, slope);
+        float next_energy = evaluate(tsf + coef * length * delta_tsf, img, ref);
+        if (next_energy >= current_energy or coef == 1) {
+            max_length = 2 * length;
+            prev_energy = current_energy;
+            return length;
+        } else if (next_energy / current_energy > 1 - epsilon) {
+            return 0;
+        } else {
+            length *= coef;
+            current_energy = next_energy;
+        }
     }
 }
 
@@ -190,33 +219,16 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
             auto &pair = pyramid.back();
             Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
             float prev_energy = evaluate(tsf, pair.first, pair.second);
-            //printf("level %lu; %g initial energy\n", pyramid.size(), prev_energy);
             float max_length;
             for (int iteration=0; iteration < iteration_count; ++iteration) {
                 Vector3 delta_tsf = update_step(pair.first, dx, pair.second, 0) + update_step(pair.first, dy, pair.second, 1);
                 if (iteration == 0) {
                     max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
                 }
-                float length = max_length;
-                float current_energy = evaluate(tsf + length * delta_tsf, pair.first, pair.second);
-                while (1) {
-                    float slope = -delta_tsf.dot(delta_tsf) * length;
-                    float coef = quadratic_minimum(current_energy, current_energy, slope);
-                    float next_energy = evaluate(tsf + coef * length * delta_tsf, pair.first, pair.second);
-                    if (next_energy >= current_energy or coef == 1) {
-                        tsf += delta_tsf * length;
-                        max_length = 2 * length;
-                        //printf(" =accept %g, step = (%g, %g, %g) = (%g, %g, %g) * %g\n", current_energy, delta_tsf[0]*length, delta_tsf[1]*length, delta_tsf[2]*length, delta_tsf[0], delta_tsf[1], delta_tsf[2], length);
-                        break;
-                    } else {
-                        length *= coef;
-                        current_energy = next_energy;
-                        //printf(" substep %g, will try length %g\n", current_energy, length);
-                    }
-                }
-                //printf("process (%i, %i) / %g results in (%g, %g, %g) / %g\n", pyramid.back().cols, pyramid.back().rows, pyramid.back().scale, delta_tsf(0), delta_tsf(1), delta_tsf(2), length);
-                if (max_length < epsilon) {
-                    //printf(" KILL!\n");
+                float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
+                if (length > 0) {
+                    tsf += delta_tsf * length;
+                } else {
                     break;
                 }
             }
