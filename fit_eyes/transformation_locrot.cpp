@@ -9,6 +9,17 @@ Transformation::Transformation(Params params, Vector3 static_params) : static_pa
 {
 }
 
+Transformation Transformation::operator + (Params delta) const
+{
+    return Transformation(params + delta, static_params);
+}
+
+Transformation& Transformation::operator += (Params delta)
+{
+    params += delta;
+    return *this;
+}
+
 Vector2 Transformation::operator () (Vector2 v) const
 {
     float angle = 3 * params[2] / static_params[2], s = sin(angle), c = cos(angle);

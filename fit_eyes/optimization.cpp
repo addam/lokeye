@@ -117,20 +117,31 @@ Vector2 Gaze::operator () (Vector2 v) const
     return {h(0) / h(2), h(1) / h(2)};
 }
 
-Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction)
+Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const
 {
     Vector3 result = {0, 0, 0};
-    // formula : delta_tsf = sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
+    // formula : delta_tsf = -sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
     Transformation tsf_inv = tsf.inverse();
     for (Pixel p : grad) {
         Vector2 v = grad.to_world(p), refv = tsf_inv(v);
         if (region.contains(to_pixel(refv))) {
             Vector3 diff = img(v) - reference(refv);
-            result += diff.dot(grad(p)) * tsf.d(refv, direction);
+            result -= diff.dot(grad(p)) * tsf.d(refv, direction);
         }
     }
-    Pixel b = *(grad.begin());
     return result;
+}
+
+float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &reference)
+{
+    float result = 0;
+    // formula : energy = 1/2 * sum_pixel (img o tsf - ref)^2
+    for (Pixel p : reference) {
+        Vector2 v = tsf(reference.to_world(p));
+        Vector3 diff = img(v) - reference(p);
+        result += diff.dot(diff);
+    }
+    return 0.5 * result;
 }
 
 float step_length(Vector3 step, Region r, const Transformation &tsf)
@@ -145,11 +156,30 @@ float step_length(Vector3 step, Region r, const Transformation &tsf)
     return result;
 }
 
+float quadratic_minimum(float fx0, float fx1, float df0)
+{
+    float second_order = fx0 - fx1 - df0;
+    float minx = -0.5 * df0 / second_order;
+    if (second_order < 0) {
+        assert (minx < 0);
+        assert (fx1 < fx0);
+    }
+    if (minx > 1) {
+        assert(fx1 < fx0);
+    }
+    if (second_order < 0 or minx > 1) {
+        return 1;
+    } else {
+        return 0.9 * minx;
+    }
+}
+
 void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
     if (not only_eyes) {
-        const int min_size = 20;
-        const int iteration_count = 3;
+        const int min_size = 10;
+        const int iteration_count = 30;
+        const float epsilon = 1e-3;
         Region rotregion = tsf(region);
         std::vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
         while (pyramid.back().second.rows > min_size and pyramid.back().second.cols > min_size) {
@@ -159,11 +189,36 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
         while (not pyramid.empty()) {
             auto &pair = pyramid.back();
             Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
+            float prev_energy = evaluate(tsf, pair.first, pair.second);
+            //printf("level %lu; %g initial energy\n", pyramid.size(), prev_energy);
+            float max_length;
             for (int iteration=0; iteration < iteration_count; ++iteration) {
                 Vector3 delta_tsf = update_step(pair.first, dx, pair.second, 0) + update_step(pair.first, dy, pair.second, 1);
-                float length = step_length(delta_tsf, rotregion, tsf);
-                tsf.params -= ((1 << pyramid.size())/(length * (1 << iteration))) * delta_tsf;
+                if (iteration == 0) {
+                    max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
+                }
+                float length = max_length;
+                float current_energy = evaluate(tsf + length * delta_tsf, pair.first, pair.second);
+                while (1) {
+                    float slope = -delta_tsf.dot(delta_tsf) * length;
+                    float coef = quadratic_minimum(current_energy, current_energy, slope);
+                    float next_energy = evaluate(tsf + coef * length * delta_tsf, pair.first, pair.second);
+                    if (next_energy >= current_energy or coef == 1) {
+                        tsf += delta_tsf * length;
+                        max_length = 2 * length;
+                        //printf(" =accept %g, step = (%g, %g, %g) = (%g, %g, %g) * %g\n", current_energy, delta_tsf[0]*length, delta_tsf[1]*length, delta_tsf[2]*length, delta_tsf[0], delta_tsf[1], delta_tsf[2], length);
+                        break;
+                    } else {
+                        length *= coef;
+                        current_energy = next_energy;
+                        //printf(" substep %g, will try length %g\n", current_energy, length);
+                    }
+                }
                 //printf("process (%i, %i) / %g results in (%g, %g, %g) / %g\n", pyramid.back().cols, pyramid.back().rows, pyramid.back().scale, delta_tsf(0), delta_tsf(1), delta_tsf(2), length);
+                if (max_length < epsilon) {
+                    //printf(" KILL!\n");
+                    break;
+                }
             }
             pyramid.pop_back();
         }

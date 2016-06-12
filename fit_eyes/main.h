@@ -61,6 +61,8 @@ struct Transformation
     Params params;
     Transformation(Region region);
     Transformation(Params, Vector3);
+    Transformation operator + (Params) const;
+    Transformation& operator += (Params);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
     Region operator () (Region) const;
