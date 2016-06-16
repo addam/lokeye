@@ -1,4 +1,8 @@
 #include "main.h"
+Transformation::Transformation(): static_params(0, 0, 1), params(0, 0, 0)
+{
+}
+
 Transformation::Transformation(Region region):
     static_params(region.x + region.width / 2, region.y + region.height / 2, std::sqrt(pow2(region.width) + pow2(region.height))),
     params(static_params[0], static_params[1], 0)

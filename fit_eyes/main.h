@@ -59,6 +59,7 @@ struct Transformation
     using Params = Vector3;
     const Vector3 static_params;
     Params params;
+    Transformation();
     Transformation(Region region);
     Transformation(Params, Vector3);
     Transformation operator + (Params) const;
