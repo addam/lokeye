@@ -49,6 +49,20 @@ struct Face
     void render(const Bitmap3&) const;
 };
 
+class Eigenface
+{
+    const static int count = 2;
+    Region region;
+    Matrix data;
+    Matrix subspace;
+    Matrix remap(const Bitmap3 &image, const Transformation &tsf) const;
+public:
+    Eigenface(const Face&);
+    void add(const Bitmap3&, Transformation tsf=Transformation());
+    cv::Vec<float, count> evaluate(const Bitmap3&, Transformation) const;
+};
+
+
 Face mark_eyes(Bitmap3&);
 Gaze calibrate(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 

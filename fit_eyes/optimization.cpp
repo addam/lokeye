@@ -3,90 +3,11 @@
 #include "optimization.h"
 #include <iostream>
 
-template<int N>
-cv::Vec<float, N+1> homogenize (cv::Vec<float, N> v)
-{
-    cv::Vec<float, N+1> result;
-    for (int i=0; i<N; i++) {
-        result[i] = v[i];
-    }
-    result[N] = 1;
-    return result;
-}
-
-template<int N>
-cv::Vec<float, N-1> dehomogenize (cv::Vec<float, N> v)
-{
-    cv::Vec<float, N-1> result;
-    const int last = N - 1;
-    for (int i=0; i<last; i++) {
-        result[i] = v[i] / v[last];
-    }
-    return result;
-}
-
-template<int N, int M>
-cv::Vec<float, N - 1> project(cv::Vec<float, M - 1> v, const cv::Matx<float, N, M> &h)
-{
-    return dehomogenize(h * homogenize(v));
-}
-
 Matrix33 cross_axes(int i, int j)
 {
     Matrix33 result = Matrix33::zeros();
     result(i, j) = 1;
     result(j, i) = -1;
-    return result;
-}
-
-template<int N>
-cv::Vec<float, N> operator/ (cv::Vec<float, N> a, cv::Vec<float, N> b)
-{
-    decltype(a) result = a;
-    for (int i=0; i<N; i++) {
-        result[i] /= b[i];
-    }
-    return result;
-}
-
-template<int N>
-cv::Vec<float, N> pow2(cv::Vec<float, N> v)
-{
-    decltype(v) result;
-    for (int i=0; i<N; i++) {
-        result[i] = v[i] * v[i];
-    }
-    return result;
-}
-
-template<int N>
-cv::Vec<float, N> sqrt(cv::Vec<float, N> v)
-{
-    decltype(v) result;
-    for (int i=0; i<N; i++) {
-        result[i] = std::sqrt(v[i]);
-    }
-    return result;
-}
-
-template<int N>
-Matrix translation(cv::Vec<float, N> v, bool inverse=false)
-{
-    Matrix result = Matrix::eye(N + 1, N + 1);
-    for (int i=0; i<N; i++) {
-        result(i, N) = inverse ? -v[i] : v[i];
-    }
-    return result;
-}
-
-template<int N>
-Matrix scaling(cv::Vec<float, N> v, bool inverse=false)
-{
-    Matrix result = Matrix::zeros(N + 1, N + 1);
-    for (int i=0; i<N; i++) {
-        result(i, i) = inverse ? 1/v[i] : v[i];
-    }
-    result(N, N) = 1;
     return result;
 }
 
@@ -122,6 +43,12 @@ Matrix35 homography(const vector<Measurement> &pairs)
             system.push_back(row.reshape(1, 1));
         }
     }
+    //if (pairs.size() == 7) {
+        //Matrix vt = cv::SVD(system, cv::SVD::FULL_UV).vt;
+        //for (int i=0; i<15; ++i) {
+            //std::cout << vt.row(i) << std::endl;
+        //}
+    //}
     Matrix h = cv::SVD(system, cv::SVD::FULL_UV).vt.row(14).reshape(1, 3);
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
@@ -405,6 +332,44 @@ float Eye::sum_boundary_dp(const Bitmap1 &derivative, bool is_vertical, const Tr
     }
     return sum_weight > 0 ? result / sum_weight : 0;
 }
+
+Matrix Eigenface::remap(const Bitmap3 &image, const Transformation &tsf) const
+{
+    Bitmap3 warp(to_rect(region));
+    int n = 0;
+    Color mean(0, 0, 0), variance(0, 0, 0);
+    for (Pixel p : warp) {
+        Color value = warp(p) = image(tsf(warp.to_world(p)));
+        n += 1;
+        variance += pow2(mean - value) * (n - 1) / n;
+        mean += (value - mean) / n;
+    }
+    Color stddev = sqrt(variance / n);
+    for (Pixel p : warp) {
+        warp(p) = (warp(p) - mean) / stddev;
+    }
+    Matrix result = warp.reshape(1, 1);
+    return result;
+}
+
+Eigenface::Eigenface(const Face &face): region(face.region)
+{
+}
+
+void Eigenface::add(const Bitmap3 &image, Transformation tsf)
+{
+    data.push_back(remap(image, tsf));
+    subspace = cv::PCA(data, cv::noArray(), cv::PCA::DATA_AS_ROW, count).eigenvectors;
+}
+
+cv::Vec<float, Eigenface::count> Eigenface::evaluate(const Bitmap3 &image, Transformation tsf) const
+{
+    cv::Vec<float, count> result;
+    Matrix warp = remap(image, tsf);
+    result = Matrix(subspace * warp.t());
+    return result;
+}
+
 
 #ifdef UNUSED
 float Eye::sum_boundary_dr(const Bitmap1 &img, const Transformation &tsf)

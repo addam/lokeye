@@ -3,28 +3,6 @@
 #include "optimization.h"
 #include <iostream>
 
-template<int N>
-cv::Vec<float, N+1> homogenize (cv::Vec<float, N> v)
-{
-    cv::Vec<float, N+1> result;
-    for (int i=0; i<N; i++) {
-        result[i] = v[i];
-    }
-    result[N] = 1;
-    return result;
-}
-
-template<int N>
-cv::Vec<float, N-1> dehomogenize (cv::Vec<float, N> v)
-{
-    cv::Vec<float, N-1> result;
-    const int last = N - 1;
-    for (int i=0; i<last; i++) {
-        result[i] = v[i] / v[last];
-    }
-    return result;
-}
-
 Matrix35 random_homography()
 {
     return Matrix35::randu(-1, 1);
@@ -56,7 +34,7 @@ int main(int argc, char** argv)
         float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
         std::cout << fit.fn << std::endl;
         for (Measurement m : sample) {
-            std::cout << m.first << " -> " << dehomogenize(h * homogenize(m.first)) << " vs. " << fit(m.first) << std::endl;
+            std::cout << m.first << " -> " << project(m.first, h) << " vs. " << fit(m.first) << std::endl;
         }
         //std::cout << "support " << support << ", " << duration << " seconds" << std::endl;
     }
