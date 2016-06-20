@@ -2,60 +2,144 @@
 #include "bitmap.h"
 #include "optimization.h"
 #include <iostream>
-using Measurements = std::vector<std::pair<Vector2, Vector2>>;
 
-Vector2 project(Vector2 v, const Matrix33 &h)
+template<int N>
+cv::Vec<float, N+1> homogenize (cv::Vec<float, N> v)
 {
-    Vector3 result{v(0), v(1), 1};
-    result = h * result;
-    return Vector2{result(0) / result(2), result(1) / result(2)};
+    cv::Vec<float, N+1> result;
+    for (int i=0; i<N; i++) {
+        result[i] = v[i];
+    }
+    result[N] = 1;
+    return result;
+}
+
+template<int N>
+cv::Vec<float, N-1> dehomogenize (cv::Vec<float, N> v)
+{
+    cv::Vec<float, N-1> result;
+    const int last = N - 1;
+    for (int i=0; i<last; i++) {
+        result[i] = v[i] / v[last];
+    }
+    return result;
+}
+
+template<int N, int M>
+cv::Vec<float, N - 1> project(cv::Vec<float, M - 1> v, const cv::Matx<float, N, M> &h)
+{
+    return dehomogenize(h * homogenize(v));
+}
+
+Matrix55 cross_axes(int i, int j)
+{
+    Matrix55 result = Matrix55::zeros();
+    result(i, j) = 1;
+    result(j, i) = -1;
+    return result;
+}
+
+template<int N>
+cv::Vec<float, N> operator/ (cv::Vec<float, N> a, cv::Vec<float, N> b)
+{
+    decltype(a) result = a;
+    for (int i=0; i<N; i++) {
+        result[i] /= b[i];
+    }
+    return result;
+}
+
+template<int N>
+cv::Vec<float, N> pow2(cv::Vec<float, N> v)
+{
+    decltype(v) result;
+    for (int i=0; i<N; i++) {
+        result[i] = v[i] * v[i];
+    }
+    return result;
+}
+
+template<int N>
+cv::Vec<float, N> sqrt(cv::Vec<float, N> v)
+{
+    decltype(v) result;
+    for (int i=0; i<N; i++) {
+        result[i] = std::sqrt(v[i]);
+    }
+    return result;
+}
+
+template<int N>
+Matrix translation(cv::Vec<float, N> v, bool inverse=false)
+{
+    Matrix result = Matrix::eye(N + 1, N + 1);
+    for (int i=0; i<N; i++) {
+        result(i, N) = inverse ? -v[i] : v[i];
+    }
+    return result;
+}
+
+template<int N>
+Matrix scaling(cv::Vec<float, N> v, bool inverse=false)
+{
+    Matrix result = Matrix::zeros(N + 1, N + 1);
+    for (int i=0; i<N; i++) {
+        result(i, i) = inverse ? 1/v[i] : v[i];
+    }
+    result(N, N) = 1;
+    return result;
 }
 
 /** Direct linear transform from pair.first to pair.second
  * Beware: the input data is modified (normalized, to be exact) in the process
  */
-Matrix33 homography(Measurements &pairs)
+Matrix35 homography(const vector<Measurement> &pairs)
 {
-    Vector2 center_left = {0, 0}, center_right = {0, 0};
-    const int count = pairs.size();
-    float scale_left = 0, scale_right = 0;
+    Vector4 center_left(0, 0), variance_left(0, 0);
+    Vector2 center_right(0, 0), variance_right(0, 0);
+    int count = 0;
     for (auto pair : pairs) {
-        center_left += pair.first / count;
-        center_right += pair.second / count;
+        count += 1;
+        variance_left += pow2(pair.first - center_left) * (count - 1) / count;
+        variance_right += pow2(pair.second - center_right) * (count - 1) / count;
+        center_left += (pair.first - center_left) / count;
+        center_right += (pair.second - center_right) / count;
     }
-    for (auto &pair : pairs) {
-        pair.first -= center_left;
-        pair.second -= center_right;
-        scale_left += cv::norm(pair.first) / count;
-        scale_right += cv::norm(pair.second) / count;
+    Vector4 stddev_left = sqrt(variance_left);
+    Vector2 stddev_right = sqrt(variance_right);
+    //for (auto &pair : pairs) {
+        //pair.first = (pair.first - center_left) / stddev_left;
+        //pair.second = (pair.second - center_right) / stddev_right;
+    //}
+    vector<Matrix55> constraints;
+    for (int i=1; i<5; ++i) {
+        for (int j=0; j<i; ++j) {
+        //int j = i - 1;
+        constraints.push_back(cross_axes(i, j));
+        std::cout << constraints.back() << std::endl;
+        }
     }
-    for (auto &pair : pairs) {
-        pair.first /= scale_left;
-        pair.second /= scale_right;
-    }
-    ColorMatrix system(0, 3);
+    Matrix system(0, 15);
     for (auto pair : pairs) {
-        //std::cout << "pair " << pair.first << " <--> " << pair.second << std::endl;
-        Vector3 pst{pair.first(0), pair.first(1), 1};
-        ColorMatrix row(1, 3);
-        row << Vector3(0, 0, 0), -1 * pst, pair.second(1) * pst;
-        system.push_back(row);
-        row << 1 * pst, Vector3(0, 0, 0), -pair.second(0) * pst;
-        system.push_back(row);
+        Vector5 lhs = homogenize(pair.first);
+        Vector3 rhs = homogenize(pair.second);
+        for (Matrix55 swap : constraints) {
+            auto row = Matrix(swap * lhs * rhs.t());
+            system.push_back(row.reshape(1, 1));
+        }
     }
-    //std::cout << "solve system: " << system << std::endl;
-    Matrix systemf = system.reshape(1);
     Matrix h;
-    cv::SVD::solveZ(systemf, h);
+    printf("solve %ix%i\n", system.rows, system.cols);
+    cv::SVD::solveZ(system, h);
     h = h.reshape(0, 3);
-    //std::cout << "produces: " << h << std::endl;
-    Matrix normalize = (Matrix(3, 3) << 1, 0, -center_left(0), 0, 1, -center_left(1), 0, 0, scale_left);
-    Matrix denormalize = (Matrix(3, 3) << scale_right, 0, center_right(0), 0, scale_right, center_right(1), 0, 0, 1);
+    return h;
+    Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
+    Matrix denormalize = translation(center_right) * scaling(stddev_right);
     return Matrix(denormalize * h * normalize);
 }
 
 template<int size>
-Measurements random_sample(const Measurements &pairs)
+vector<Measurement> random_sample(const vector<Measurement> &pairs)
 {
     std::array<int, size> indices;
     std::random_device rd;
@@ -66,36 +150,39 @@ Measurements random_sample(const Measurements &pairs)
         int index = std::uniform_int_distribution<>(0, high - 1)(generator);
         *it = (std::find(indices.begin(), it, index) == it) ? index : high;
     }
-    Measurements result;
+    vector<Measurement> result;
     result.reserve(size);
     std::transform(indices.begin(), indices.end(), std::back_inserter(result), [pairs](int index) { return pairs[index]; });
     return result;
 }
 
-Measurements support(const Matrix33 h, const Measurements &pairs, const float precision)
+vector<Measurement> support(const Matrix35 h, const vector<Measurement> &pairs, const float precision)
 {
-    Measurements result;
-    std::copy_if(pairs.begin(), pairs.end(), std::back_inserter(result), [h, precision](std::pair<Vector2, Vector2> p) { return cv::norm(project(p.first, h) - p.second) < precision; });
+    vector<Measurement> result;
+    std::copy_if(pairs.begin(), pairs.end(), std::back_inserter(result), [h, precision](Measurement p) { return cv::norm(project(p.first, h) - p.second) < precision; });
     return result;
 }
 
 template<int count>
 float combinations_ratio(int count_total, int count_good)
 {
-    const float logp = -2;
-    float result = logp / std::log(1 - pow2(pow2(count_good / float(count_total))));
+    const float logp = -0.2;
+    float result = logp / std::log(1 - pow(count_good / float(count_total), count));
     //printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
     return result;
 }
 
-Gaze::Gaze(const Measurements &pairs, int &out_support, float precision)
+Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
 {
+    fn = homography(pairs);
+    return;
     out_support = 0;
-    float iterations = combinations_ratio<4>(pairs.size(), 4);
+    const int min_sample = 8;
+    float iterations = combinations_ratio<min_sample>(pairs.size(), min_sample);
     for (int i=0; i < iterations; i++) {
-        std::vector<std::pair<Vector2, Vector2>> sample = random_sample<4>(pairs);
+        vector<Measurement> sample = random_sample<min_sample>(pairs);
         size_t prev_sample_size;
-        Matrix33 h;
+        Matrix35 h;
         do {
             prev_sample_size = sample.size();
             h = homography(sample);
@@ -104,17 +191,15 @@ Gaze::Gaze(const Measurements &pairs, int &out_support, float precision)
         if (sample.size() > out_support) {
             out_support = sample.size();
             fn = h;
-            iterations = combinations_ratio<4>(pairs.size(), sample.size());
+            iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());
         }
     }
-    printf("support = %i / %lu, %f %f %f; %f %f %f; %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(1,0), fn(1,1), fn(1,2), fn(2,0), fn(2,1), fn(2,2));
+    printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
 }
 
-Vector2 Gaze::operator () (Vector2 v) const
+Vector2 Gaze::operator () (Vector4 v) const
 {
-    Vector3 h{v(0), v(1), 1};
-    h = fn * h;
-    return {h(0) / h(2), h(1) / h(2)};
+    return project(v, fn);
 }
 
 Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const
@@ -210,7 +295,7 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
         const int iteration_count = 30;
         const float epsilon = 1e-3;
         Region rotregion = tsf(region);
-        std::vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
+        vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
         while (pyramid.back().second.rows > min_size and pyramid.back().second.cols > min_size) {
             auto &pair = pyramid.back();
             pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
@@ -241,9 +326,10 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
     }
 }
 
-Vector2 Face::operator () () const
+Vector4 Face::operator () () const
 {
-    return eyes[0].pos + eyes[1].pos;
+    const Vector2 &l = eyes[0].pos, &r = eyes[1].pos;
+    return Vector4(l[0], l[1], r[0], r[1]);
 }
 
 inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)

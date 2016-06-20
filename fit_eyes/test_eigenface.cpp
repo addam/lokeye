@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     Face state = mark_eyes(image);
     std::cout << state.region << std::endl;
     Matrix data = remap(image, state.region, state.tsf);
-    for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
+    while (char(cv::waitKey(5)) != 27 and image.read(cam)) {
         TimePoint time_start = std::chrono::high_resolution_clock::now();
         state.refit(image);
         data.push_back(remap(image, state.region, state.tsf));
@@ -83,7 +83,6 @@ int main(int argc, char** argv)
         printf(" processing %i faces took %g s (%g s / face)\n", data.rows, duration, duration / data.rows);
         cv::imshow("first", reshape(eigenfaces.row(0), state.region));
         cv::imshow("second", reshape(eigenfaces.row(1), state.region));
-        cv::waitKey(1);
         std::cout << state.tsf.params << std::endl;
         state.render(image);
     }

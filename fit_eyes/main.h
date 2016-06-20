@@ -8,13 +8,18 @@
 #include <vector>
 #include <chrono>
 
+using std::vector;
 using Pixel = cv::Point;
 using Vector2 = cv::Vec2f;
 using Vector3 = cv::Vec3f;
+using Vector4 = cv::Vec<float, 4>;
+using Vector5 = cv::Vec<float, 5>;
 using Matrix22 = cv::Matx22f;
 using Matrix23 = cv::Matx23f;
 using Matrix32 = cv::Matx32f;
 using Matrix33 = cv::Matx33f;
+using Matrix35 = cv::Matx<float, 3, 5>;
+using Matrix55 = cv::Matx<float, 5, 5>;
 using cv::VideoCapture;
 using cv::Rect;
 using Region = cv::Rect_<float>;

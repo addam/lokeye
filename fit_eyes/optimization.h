@@ -1,11 +1,13 @@
 #ifndef OPTIMIZATION_H
 #define OPTIMIZATION_H
 
+using Measurement = std::pair<Vector4, Vector2>;
+
 struct Gaze
 {
-    Matrix33 fn;
-    Gaze(const std::vector<std::pair<Vector2, Vector2>>&, int &out_support, float precision=50);
-    Vector2 operator () (Vector2) const;
+    Matrix35 fn;
+    Gaze(const vector<Measurement>&, int &out_support, float precision=50);
+    Vector2 operator () (Vector4) const;
 };
 
 struct Eye
@@ -43,7 +45,7 @@ struct Face
     }
     Vector3 update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const;
     void refit(const Bitmap3&, bool only_eyes=false);
-    Vector2 operator() () const;
+    Vector4 operator() () const;
     void render(const Bitmap3&) const;
 };
 

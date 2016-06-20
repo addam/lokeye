@@ -13,7 +13,7 @@ struct State
     const char *winname;
     const Bitmap3 &canvas;
     Pixel begin, end;
-    std::vector<Eye> eyes;
+    vector<Eye> eyes;
     bool has_rectangle = false;
     bool pressed = false;
     State(const char *winname, const Bitmap3 &img) : winname{winname}, canvas{img} {
@@ -99,9 +99,10 @@ void Face::render(const Bitmap3 &image) const {
 Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
 {
     const int divisions = 3;
+    const int necessary_support = divisions * divisions;
     const char winname[] = "calibrate";
     const Vector3 bgcolor(0.7, 0.6, 0.5);
-    std::vector<std::pair<Vector2, Vector2>> measurements;
+    vector<Measurement> measurements;
     Bitmap3 canvas(window_size.y, window_size.x);
     canvas = bgcolor;
     cv::namedWindow(winname);
@@ -113,7 +114,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
     std::uniform_real_distribution<> urand(0, 1);
     std::pair<Bitmap3, Vector2> task;
     while (1) {
-        std::vector<Vector2> points;
+        vector<Vector2> points;
         for (int i=0; i<divisions; i++) {
             for (int j=0; j<divisions; j++) {
                 points.emplace_back(cell[0] * (j + urand(generator)), cell[1] * (i + urand(generator)));
@@ -130,7 +131,6 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
                 face.render(task.first);
                 measurements.emplace_back(std::make_pair(face(), task.second));
             }
-            const int necessary_support = divisions * divisions;
             if (measurements.size() >= necessary_support) {
                 int support;
                 const float precision = 50;

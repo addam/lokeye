@@ -18,6 +18,7 @@ test_bitmap: bitmap.o
 test_main: bitmap.o transformation_locrot.o
 test_face: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION) ui.o
 test_eigenface: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION) ui.o
+test_gaze: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION)
 test_%: test_%.cpp
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
