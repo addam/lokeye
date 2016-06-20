@@ -134,3 +134,7 @@ Na letošním Siggraph byl podrobný tracker hlavy (včetně výrazu tváře) a 
 Přepsal jsem hledání obličeje tak, aby jednou prošlo obrazovou pyramidu. Zásadní zjištění je, že výpočet brutálně divergoval, když gradient nebyl správně posunutý o půlpixely; po šestnáctinásobném zmenšení znamená ten půlpixel už v původním obrázku obrovský posuv. Program teď stíhá zpracovat asi 4 snímky za vteřinu.
 
 Zkusil jsem pro optimalizaci použít knihovnu Ceres; měl jsem za to, že bude dávat přesnější výsledky bez námahy, takže by šla použít jako referenční výpočet pro různé budoucí triky. Námahy bylo docela dost, použití na obrazová data vyžaduje alokovat tři wrappery na pixel. Především ale přímočarý KLT tracker nefunguje, s pyramidou ani bez ní. Tenhle plán opouštím a rovnice si budu řešit sám.
+
+Přepsal jsem výpočet směru pohledu (`Gaze`) tak, aby vstupní vektor byl čtyřrozměrný; další dvě složky jsou otočení hlavy. Není vcelku problém to zobecnit na větší počet.
+
+Napsal jsem rozpoznávání eigenfaces. Ukázkový program `test_eigenface` sleduje hlavu a buďto z videa počítá kovarianci, anebo vypisuje projekci na dvě principal components. Mám ale zlé tušení, že první dvě komponenty jsou na úhlu závislé kvadraticky, a mají maximum/minimum okolo nuly. Intuitivně to odpovídá tomu, že zkrácení obrázku v jednom směru je důležitější než změna osvětlení. Chce to podrobnější průzkum -- kdyby ta závislost vážně byla kvadratická, šlo by to i využít.
