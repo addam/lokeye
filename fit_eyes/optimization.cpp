@@ -31,9 +31,9 @@ cv::Vec<float, N - 1> project(cv::Vec<float, M - 1> v, const cv::Matx<float, N, 
     return dehomogenize(h * homogenize(v));
 }
 
-Matrix55 cross_axes(int i, int j)
+Matrix33 cross_axes(int i, int j)
 {
-    Matrix55 result = Matrix55::zeros();
+    Matrix33 result = Matrix33::zeros();
     result(i, j) = 1;
     result(j, i) = -1;
     return result;
@@ -107,32 +107,22 @@ Matrix35 homography(const vector<Measurement> &pairs)
     }
     Vector4 stddev_left = sqrt(variance_left);
     Vector2 stddev_right = sqrt(variance_right);
-    //for (auto &pair : pairs) {
-        //pair.first = (pair.first - center_left) / stddev_left;
-        //pair.second = (pair.second - center_right) / stddev_right;
-    //}
-    vector<Matrix55> constraints;
-    for (int i=1; i<5; ++i) {
+    vector<Matrix33> constraints;
+    for (int i=1; i<3; ++i) {
         for (int j=0; j<i; ++j) {
-        //int j = i - 1;
-        constraints.push_back(cross_axes(i, j));
-        std::cout << constraints.back() << std::endl;
+            constraints.push_back(cross_axes(i, j));
         }
     }
     Matrix system(0, 15);
     for (auto pair : pairs) {
-        Vector5 lhs = homogenize(pair.first);
-        Vector3 rhs = homogenize(pair.second);
-        for (Matrix55 swap : constraints) {
-            auto row = Matrix(swap * lhs * rhs.t());
+        Vector5 lhs = homogenize((pair.first - center_left) / stddev_left);
+        Vector3 rhs = homogenize((pair.second - center_right) / stddev_right);
+        for (Matrix33 swap : constraints) {
+            auto row = Matrix(swap * rhs * lhs.t());
             system.push_back(row.reshape(1, 1));
         }
     }
-    Matrix h;
-    printf("solve %ix%i\n", system.rows, system.cols);
-    cv::SVD::solveZ(system, h);
-    h = h.reshape(0, 3);
-    return h;
+    Matrix h = cv::SVD(system, cv::SVD::FULL_UV).vt.row(14).reshape(1, 3);
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
     return Matrix(denormalize * h * normalize);
@@ -141,6 +131,9 @@ Matrix35 homography(const vector<Measurement> &pairs)
 template<int size>
 vector<Measurement> random_sample(const vector<Measurement> &pairs)
 {
+    if (pairs.size() <= size) {
+        return vector<Measurement>(pairs.begin(), pairs.end());
+    }
     std::array<int, size> indices;
     std::random_device rd;
     std::minstd_rand generator(rd());
@@ -174,11 +167,9 @@ float combinations_ratio(int count_total, int count_good)
 
 Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
 {
-    fn = homography(pairs);
-    return;
     out_support = 0;
-    const int min_sample = 8;
-    float iterations = combinations_ratio<min_sample>(pairs.size(), min_sample);
+    const int min_sample = 7;
+    float iterations = 1 + combinations_ratio<min_sample>(pairs.size(), min_sample);
     for (int i=0; i < iterations; i++) {
         vector<Measurement> sample = random_sample<min_sample>(pairs);
         size_t prev_sample_size;
