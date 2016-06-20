@@ -23,7 +23,20 @@ Color operator* (Color a, Color b)
     return Color(a[0] * b[0], a[1] * b[1], a[2] * b[2]);
 }
 
-Matrix remap(const Bitmap3 &image, Region region, const Transformation &tsf=Transformation())
+class Eigenface
+{
+    const static int count = 2;
+    Region region;
+    Matrix data;
+    Matrix subspace;
+    Matrix remap(const Bitmap3 &image, const Transformation &tsf) const;
+public:
+    Eigenface(const Face&);
+    void add(const Bitmap3&, Transformation tsf=Transformation());
+    cv::Vec<float, count> evaluate(const Bitmap3&, Transformation) const;
+};
+
+Matrix Eigenface::remap(const Bitmap3 &image, const Transformation &tsf) const
 {
     Bitmap3 warp(to_rect(region));
     int count = 0;
@@ -42,28 +55,22 @@ Matrix remap(const Bitmap3 &image, Region region, const Transformation &tsf=Tran
     return result;
 }
 
-Bitmap3 reshape(const Matrix &data, Region region)
+Eigenface::Eigenface(const Face &face): region(face.region)
 {
-    Bitmap3 result = ColorMatrix(data.reshape(3, to_rect(region).height));
-    float h = 1e10;
-    Color min(h, h, h), max(-h, -h, -h);
-    for (Pixel p : result) {
-        Color value = result(p);
-        for (int i=0; i<3; i++) {
-            min[i] = std::min(min[i], value[i]);
-            max[i] = std::max(max[i], value[i]);
-        }
-    }
-    for (Pixel p : result) {
-        result(p) = min + result(p) / (max - min);
-    }    
-    return result;
 }
 
-Matrix eigensamples(Matrix samples, int count)
+void Eigenface::add(const Bitmap3 &image, Transformation tsf)
 {
-    cv::PCA subspace(samples, cv::noArray(), cv::PCA::DATA_AS_ROW, count);
-    return subspace.eigenvectors;
+    data.push_back(remap(image, tsf));
+    subspace = cv::PCA(data, cv::noArray(), cv::PCA::DATA_AS_ROW, count).eigenvectors;
+}
+
+cv::Vec<float, Eigenface::count> Eigenface::evaluate(const Bitmap3 &image, Transformation tsf) const
+{
+    cv::Vec<float, count> result;
+    Matrix warp = remap(image, tsf);
+    result = Matrix(subspace * warp.t());
+    return result;
 }
 
 int main(int argc, char** argv)
@@ -73,18 +80,28 @@ int main(int argc, char** argv)
     assert (image.read(cam));
     Face state = mark_eyes(image);
     std::cout << state.region << std::endl;
-    Matrix data = remap(image, state.region, state.tsf);
+    Eigenface appearance(state);
+    appearance.add(image, state.tsf);
+    bool do_add = true;
     while (char(cv::waitKey(5)) != 27 and image.read(cam)) {
-        TimePoint time_start = std::chrono::high_resolution_clock::now();
-        state.refit(image);
-        data.push_back(remap(image, state.region, state.tsf));
-        Matrix eigenfaces = eigensamples(data, 2);
-        float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
-        printf(" processing %i faces took %g s (%g s / face)\n", data.rows, duration, duration / data.rows);
-        cv::imshow("first", reshape(eigenfaces.row(0), state.region));
-        cv::imshow("second", reshape(eigenfaces.row(1), state.region));
-        std::cout << state.tsf.params << std::endl;
-        state.render(image);
+        if (do_add) {
+            TimePoint time_start = std::chrono::high_resolution_clock::now();
+            state.refit(image);
+            appearance.add(image, state.tsf);
+            float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
+            printf(" adding a face took %g s\n", duration);
+        } else {
+            TimePoint time_start = std::chrono::high_resolution_clock::now();
+            auto projection = appearance.evaluate(image, state.tsf);
+            float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
+            printf(" [%g, %g]; processing took %g s, \n", projection[0], projection[1], duration);
+        }
+        char c = cv::waitKey(1);
+        if (c == 27) {
+            break;
+        } else if (c == 'a') {
+            do_add ^= true;
+        }
     }
     return 0;
 }
