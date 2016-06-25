@@ -11,6 +11,41 @@ Matrix33 cross_axes(int i, int j)
     return result;
 }
 
+float evaluate_homography(const Matrix35 &h, const vector<Measurement> &pairs)
+{
+    float value = 0;
+    for (auto pair : pairs) {
+        Vector2 p = project(pair.first, h);
+        value += cv::norm(p - pair.second, cv::NORM_L2SQR);
+    }
+    return 0.5 * value;
+}
+
+void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
+{
+    for (int i=0; i<10; i++) {
+        Matrix35 gradient = Matrix35::zeros();
+        float value = 0;
+        for (auto pair : pairs) {
+            Vector3 p = h * homogenize(pair.first);
+            Vector2 diff = Vector2{p[0] / p[2], p[1] / p[2]} - pair.second;
+            Vector3 delta_projection = {diff[0], diff[1], -(diff[0] + diff[1]) / p[2]};
+            Matrix35 gradient_piece = Matrix(Matrix(delta_projection) * Matrix(homogenize(pair.first)).t());
+            gradient += 0.5 * gradient_piece;
+        }
+        value = evaluate_homography(h, pairs);
+        float grad_norm = cv::norm(gradient, cv::NORM_L2SQR);
+        float step_size = 1 / grad_norm;//value / std::max(1.f, grad_norm);
+        while (evaluate_homography(h - gradient * step_size, pairs) > value) {
+            step_size /= 2;
+            if (step_size < 1e-20) {
+                return;
+            }
+        }
+        h -= gradient * step_size;
+    }
+}
+
 /** Direct linear transform from pair.first to pair.second
  * Beware: the input data is modified (normalized, to be exact) in the process
  */
@@ -43,16 +78,14 @@ Matrix35 homography(const vector<Measurement> &pairs)
             system.push_back(row.reshape(1, 1));
         }
     }
-    //if (pairs.size() == 7) {
-        //Matrix vt = cv::SVD(system, cv::SVD::FULL_UV).vt;
-        //for (int i=0; i<15; ++i) {
-            //std::cout << vt.row(i) << std::endl;
-        //}
-    //}
     Matrix h = cv::SVD(system, cv::SVD::FULL_UV).vt.row(14).reshape(1, 3);
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
-    return Matrix(denormalize * h * normalize);
+    Matrix35 result = Matrix(denormalize * h * normalize);
+    if (pairs.size() > 7) {
+        refit_homography(result, pairs);
+    }
+    return result;
 }
 
 template<int size>
@@ -112,7 +145,6 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
             iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());
         }
     }
-    fn *= 1./cv::norm(fn);
     printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
 }
 
