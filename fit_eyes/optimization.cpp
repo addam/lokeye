@@ -86,7 +86,7 @@ vector<Measurement> support(const Matrix35 h, const vector<Measurement> &pairs, 
 template<int count>
 float combinations_ratio(int count_total, int count_good)
 {
-    const float logp = -0.2;
+    const float logp = -1;
     float result = logp / std::log(1 - pow(count_good / float(count_total), count));
     //printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
     return result;
@@ -112,6 +112,7 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
             iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());
         }
     }
+    fn *= 1./cv::norm(fn);
     printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
 }
 
@@ -244,10 +245,11 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
     }
 }
 
-Vector4 Face::operator () () const
+Vector4 Face::operator () (const Bitmap3 &image) const
 {
-    const Vector2 &l = eyes[0].pos, &r = eyes[1].pos;
-    return Vector4(l[0], l[1], r[0], r[1]);
+    const Vector2 e = eyes[0].pos + eyes[1].pos;
+    const Vector2 a = appearance(image, tsf);
+    return Vector4(e[0], e[1], a[0], a[1]);
 }
 
 inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
@@ -333,7 +335,7 @@ float Eye::sum_boundary_dp(const Bitmap1 &derivative, bool is_vertical, const Tr
     return sum_weight > 0 ? result / sum_weight : 0;
 }
 
-Matrix Eigenface::remap(const Bitmap3 &image, const Transformation &tsf) const
+Matrix remap(const Bitmap3 &image, Region region, const Transformation &tsf)
 {
     Bitmap3 warp(to_rect(region));
     int n = 0;
@@ -352,21 +354,21 @@ Matrix Eigenface::remap(const Bitmap3 &image, const Transformation &tsf) const
     return result;
 }
 
-Eigenface::Eigenface(const Face &face): region(face.region)
+void Face::record_appearance(const Bitmap3 &image, bool do_recalculate)
 {
+    eigenfaces.push_back(remap(image, region, tsf));
+    if (do_recalculate) {
+        subspace = cv::PCA(eigenfaces, cv::noArray(), cv::PCA::DATA_AS_ROW, 2).eigenvectors;
+    }
 }
 
-void Eigenface::add(const Bitmap3 &image, Transformation tsf)
+Vector2 Face::appearance(const Bitmap3 &image, const Transformation &transformation) const
 {
-    data.push_back(remap(image, tsf));
-    subspace = cv::PCA(data, cv::noArray(), cv::PCA::DATA_AS_ROW, count).eigenvectors;
-}
-
-cv::Vec<float, Eigenface::count> Eigenface::evaluate(const Bitmap3 &image, Transformation tsf) const
-{
-    cv::Vec<float, count> result;
-    Matrix warp = remap(image, tsf);
-    result = Matrix(subspace * warp.t());
+    Vector2 result;
+    if (not subspace.empty()) {
+        Matrix warp = remap(image, region, transformation);
+        result = Matrix(subspace * warp.t());
+    }
     return result;
 }
 

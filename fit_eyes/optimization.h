@@ -41,27 +41,18 @@ struct Face
      */
     Transformation tsf;
     
+    Matrix eigenfaces;
+    Matrix subspace;
+    
     Face(const Bitmap3 &ref, Region region, Eye left_eye, Eye right_eye) : ref{ref.clone()}, tsf{region}, region{region}, eyes{left_eye, right_eye} {
     }
     Vector3 update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const;
     void refit(const Bitmap3&, bool only_eyes=false);
-    Vector4 operator() () const;
+    Vector4 operator() (const Bitmap3&) const;
+    Vector2 appearance(const Bitmap3&, const Transformation&) const;
+    void record_appearance(const Bitmap3&, bool do_recalculate=false);
     void render(const Bitmap3&) const;
 };
-
-class Eigenface
-{
-    const static int count = 2;
-    Region region;
-    Matrix data;
-    Matrix subspace;
-    Matrix remap(const Bitmap3 &image, const Transformation &tsf) const;
-public:
-    Eigenface(const Face&);
-    void add(const Bitmap3&, Transformation tsf=Transformation());
-    cv::Vec<float, count> evaluate(const Bitmap3&, Transformation) const;
-};
-
 
 Face mark_eyes(Bitmap3&);
 Gaze calibrate(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));

@@ -99,10 +99,11 @@ void Face::render(const Bitmap3 &image) const {
 Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
 {
     const int divisions = 3;
-    const int necessary_support = divisions * divisions;
+    const int necessary_support = 2 * divisions * divisions;
     const char winname[] = "calibrate";
     const Vector3 bgcolor(0.7, 0.6, 0.5);
     vector<Measurement> measurements;
+    vector<std::pair<Bitmap3, Transformation>> memory;
     Bitmap3 canvas(window_size.y, window_size.x);
     canvas = bgcolor;
     cv::namedWindow(winname);
@@ -126,12 +127,22 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             cv::circle(canvas, to_pixel(point), 50, cv::Scalar(0, 0.6, 1), -1);
             cv::circle(canvas, to_pixel(point), 5, cv::Scalar(0, 0, 0.3), -1);
             cv::imshow(winname, canvas);
+            bool do_recalc_gaze = measurements.size() % 9 == 0 and measurements.size() >= necessary_support;
             if (not task.first.empty()) {
                 face.refit(task.first);
                 face.render(task.first);
-                measurements.emplace_back(std::make_pair(face(), task.second));
+                memory.emplace_back(std::make_pair(task.first, face.tsf));
+                measurements.emplace_back(std::make_pair(face(task.first), task.second));
+                face.record_appearance(task.first, do_recalc_gaze);
             }
-            if (measurements.size() >= necessary_support) {
+            if (do_recalc_gaze) {
+                for (int i=0; i<measurements.size(); ++i) {
+                    std::pair<Bitmap3, Transformation> &s = memory[i];
+                    Vector4 &m = measurements[i].first;
+                    Vector2 a = face.appearance(s.first, s.second);
+                    m[2] = a[0];
+                    m[3] = a[1];
+                }
                 int support;
                 const float precision = 50;
                 Gaze result(measurements, support, precision);

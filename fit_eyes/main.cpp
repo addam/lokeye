@@ -16,7 +16,7 @@ int main(int argc, char** argv)
         reference_image.read(cam);
     }
     Face state = mark_eyes(reference_image);
-    Pixel size(1400, 700);
+    Pixel size(1650, 1000);
     Gaze fit = calibrate(state, cam, size);
     const Vector3 bg_color(0.4, 0.3, 0.3);
     Bitmap3 record(size.y, size.x);
@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     Vector2 prev_pos(-1, -1);
     for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
         state.refit(image);
-        Vector2 pos = fit(state());
+        Vector2 pos = fit(state(image));
         //std::cout << "position: " << pos(0) << ", " << pos(1) << std::endl;
         state.render(image);
         if (inside(pos, size) and inside(prev_pos, size)) {
