@@ -25,7 +25,6 @@ void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
 {
     for (int i=0; i<10; i++) {
         Matrix35 gradient = Matrix35::zeros();
-        float value = 0;
         for (auto pair : pairs) {
             Vector3 p = h * homogenize(pair.first);
             Vector2 diff = Vector2{p[0] / p[2], p[1] / p[2]} - pair.second;
@@ -33,7 +32,7 @@ void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
             Matrix35 gradient_piece = Matrix(Matrix(delta_projection) * Matrix(homogenize(pair.first)).t());
             gradient += 0.5 * gradient_piece;
         }
-        value = evaluate_homography(h, pairs);
+        float value = evaluate_homography(h, pairs);
         float grad_norm = cv::norm(gradient, cv::NORM_L2SQR);
         float step_size = 1 / grad_norm;//value / std::max(1.f, grad_norm);
         while (evaluate_homography(h - gradient * step_size, pairs) > value) {
@@ -78,7 +77,23 @@ Matrix35 homography(const vector<Measurement> &pairs)
             system.push_back(row.reshape(1, 1));
         }
     }
-    Matrix h = cv::SVD(system, cv::SVD::FULL_UV).vt.row(14).reshape(1, 3);
+    Matrix vt = cv::SVD(system, cv::SVD::FULL_UV).vt;
+    Matrix resystem(0, 15);
+    Matrix rerhs(0, 1);
+    for (auto pair : pairs) {
+        Matrix block(3, 15);
+        for (int i=0; i<15; ++i) {
+            block.col(i) = vt.row(i).reshape(1, 3) * Matrix(homogenize(pair.first));
+        }
+        resystem.push_back(block);
+        rerhs.push_back(Matrix(homogenize(pair.second)));
+    }
+    Matrix coefficients;
+    cv::solve(resystem, rerhs, coefficients, cv::DECOMP_SVD | cv::DECOMP_NORMAL);
+    Matrix h(3, 5);
+    for (int i=0; i<15; ++i) {
+        h += coefficients(i, 0) * vt.row(i).reshape(1, 3);
+    }
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
     Matrix35 result = Matrix(denormalize * h * normalize);
@@ -127,9 +142,10 @@ float combinations_ratio(int count_total, int count_good)
 
 Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
 {
+    const int necessary_support = std::min(out_support, int(pairs.size()));
     out_support = 0;
     const int min_sample = 7;
-    float iterations = 1 + combinations_ratio<min_sample>(pairs.size(), min_sample);
+    float iterations = 1 + combinations_ratio<min_sample>(pairs.size(), necessary_support);
     for (int i=0; i < iterations; i++) {
         vector<Measurement> sample = random_sample<min_sample>(pairs);
         size_t prev_sample_size;
@@ -139,7 +155,7 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
             h = homography(sample);
             sample = support(h, pairs, precision);
         } while (sample.size() > prev_sample_size);
-        if (sample.size() > out_support) {
+        if (sample.size() > out_support and sample.size() >= necessary_support) {
             out_support = sample.size();
             fn = h;
             iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());

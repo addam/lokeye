@@ -15,7 +15,8 @@ vector<Measurement> generate_correspondences(const Matrix35 &h, int count)
         Vector4 x;
         cv::randu(x, -1, 1);
         x[2] *= 100;
-        x[3] *= 100;
+        x[3] = x[2];
+        x[1] = x[0];
         Vector2 y;
         cv::randu(y, -1e-5, 1e-5);
         y += dehomogenize(h * homogenize(x));
