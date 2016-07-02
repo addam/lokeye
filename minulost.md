@@ -137,4 +137,8 @@ Zkusil jsem pro optimalizaci použít knihovnu Ceres; měl jsem za to, že bude 
 
 Přepsal jsem výpočet směru pohledu (`Gaze`) tak, aby vstupní vektor byl čtyřrozměrný; další dvě složky jsou otočení hlavy. Není vcelku problém to zobecnit na větší počet.
 
-Napsal jsem rozpoznávání eigenfaces. Ukázkový program `test_eigenface` sleduje hlavu a buďto z videa počítá kovarianci, anebo vypisuje projekci na dvě principal components. Mám ale zlé tušení, že první dvě komponenty jsou na úhlu závislé kvadraticky, a mají maximum/minimum okolo nuly. Intuitivně to odpovídá tomu, že zkrácení obrázku v jednom směru je důležitější než změna osvětlení. Chce to podrobnější průzkum -- kdyby ta závislost vážně byla kvadratická, šlo by to i využít.
+Napsal jsem rozpoznávání eigenfaces. Ukázkový program `test_eigenface` sleduje hlavu a buďto z videa počítá kovarianci, anebo vypisuje projekci na dvě principal components.
+
+## Červenec 2016
+
+Zabudoval jsem otočení hlavy podle eigenfaces do výpočtu homografie. Výpočet potom ale přestane fungovat, a to i v případě, že je hlava nehybná. Po několika šarlatánských pokusech se samotným DLT algoritmem (ne, ten je zřejmě v pořádku) jsem dospěl k závěru, že problém je v RANSAC algoritmu. Výsledky z eigenfaces mají příliš nízký poměr signálu k šumu, a každý minimální vzorek měření (v případě téhle homografie je to 7 trénovacích párů) je nevyhnutelně přeučený. Problém ale víceméně přetrvává i když spustím RANSAC se vzorky třeba dvojnásobné velikosti, takže možná ten přístup s eigenfaces je celkově příliš vágní.

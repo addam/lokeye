@@ -1,16 +1,16 @@
 # Aktuální plán a TODO list
 
-poslední změna: 20. června
+poslední změna: 2. července
 
 ## Optimalizaci nechat na knihovně Ceres
 Ceres nabízí několik klasických algoritmů pro nelineární optimalizaci. Derivace si počítá sama, a to zčásti už během kompilace. Docela jistě prospěje přesnosti výpočtu, namísto metody největšího spádu s krokem pevné délky, jak ho používám teď.
 
-Neprospěje. Výpočet nefunguje a kód je spíš ošklivější, než byl dřív.
-
-Potud hotovo. Následující bod mám rozpracovaný:
+Neprospěje. Výpočet nefunguje a kód je spíš ošklivější, než byl dřív, proto si optimalizaci zařídím sám.
 
 ## Zohlednit natočení hlavy
 Můžeme sice předpokládat, že se uživatel dívá na monitor přímo, ale i malé otočení hlavy má na výsledky obrovský vliv. V neměnném směrovém osvětlení by mohlo stačit otáčení hlavy modelovat jako lineární kombinaci obrázků, na způsob eigenfaces. Rozlišení by mělo být dost hrubé, aby pohyb očí už nebyl vidět.
+
+Potud hotovo, ale nefunguje pak fitování gaze.
 
 Správnější přístup by byl odhadnout hloubkovou mapu a do modelu hlavy pak přidat ještě vliv optical flow. Při hrubém rozlišení by to mohlo být i docela stabilní. Řešily by se tak problémy s obroučkami brýlí, které akorát překážejí v oblasti u kořene nosu a nepředvídatelným způsobem čouhají do prostoru.
 
