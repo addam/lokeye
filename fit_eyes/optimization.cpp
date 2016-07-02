@@ -78,25 +78,20 @@ Matrix35 homography(const vector<Measurement> &pairs)
         }
     }
     Matrix vt = cv::SVD(system, cv::SVD::FULL_UV).vt;
-    Matrix resystem(0, 15);
-    Matrix rerhs(0, 1);
-    for (auto pair : pairs) {
-        Matrix block(3, 15);
-        for (int i=0; i<15; ++i) {
-            block.col(i) = vt.row(i).reshape(1, 3) * Matrix(homogenize(pair.first));
-        }
-        resystem.push_back(block);
-        rerhs.push_back(Matrix(homogenize(pair.second)));
-    }
-    Matrix coefficients;
-    cv::solve(resystem, rerhs, coefficients, cv::DECOMP_SVD | cv::DECOMP_NORMAL);
-    Matrix h(3, 5);
-    for (int i=0; i<15; ++i) {
-        h += coefficients(i, 0) * vt.row(i).reshape(1, 3);
-    }
+    float best_error = 1e20;
+    Matrix35 result;
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
-    Matrix35 result = Matrix(denormalize * h * normalize);
+    for (int i=0; i<15; ++i) {
+        Matrix h = vt.row(i).reshape(1, 3);
+        Matrix35 candidate = Matrix(denormalize * h * normalize);
+        float error = evaluate_homography(candidate, pairs);
+        if (error < best_error) {
+            best_error = error;
+            result = candidate;
+        }
+    }
+    }
     if (pairs.size() > 7) {
         refit_homography(result, pairs);
     }

@@ -18,8 +18,21 @@ vector<Measurement> generate_correspondences(const Matrix35 &h, int count)
         x[3] = x[2];
         x[1] = x[0];
         Vector2 y;
-        cv::randu(y, -1e-5, 1e-5);
+        cv::randu(y, -1e-3, 1e-3);
         y += dehomogenize(h * homogenize(x));
+        result.push_back(std::make_pair(x, y));
+    }
+    return result;
+}
+
+vector<Measurement> generate_random(int count)
+{
+    vector<Measurement> result;
+    for (int i=0; i<count; ++i) {
+        Vector4 x;
+        cv::randu(x, -1, 1);
+        Vector2 y;
+        cv::randu(y, -1, 1);
         result.push_back(std::make_pair(x, y));
     }
     return result;
@@ -30,7 +43,7 @@ int main(int argc, char** argv)
     Matrix35 h = random_homography();
     h *= 1./cv::norm(h, cv::NORM_L1);
     std::cout << h << std::endl;
-    for (int i=197; i < 200; ++i) {
+    for (int i=17; i < 20; ++i) {
         vector<Measurement> sample = generate_correspondences(h, i);
         TimePoint time_start = std::chrono::high_resolution_clock::now();
         int support = 7;
@@ -39,9 +52,17 @@ int main(int argc, char** argv)
         fit.fn *= 1./cv::norm(fit.fn, cv::NORM_L1);
         std::cout << fit.fn << std::endl;
         for (Measurement m : sample) {
-            //std::cout << m.first << " -> " << project(m.first, h) << " vs. " << fit(m.first) << std::endl;
+            std::cout << m.first << " -> " << project(m.first, h) << " vs. " << fit(m.first) << std::endl;
         }
         //std::cout << "support " << support << ", " << duration << " seconds" << std::endl;
+    }
+    for (int i=5; i<9; ++i) {
+        auto sample = generate_random(i);
+        int support = 5;
+        Gaze fit(sample, support, 0.1);
+        for (Measurement m : sample) {
+            std::cout << m.first << " -> " << m.second << " vs. " << fit(m.first) << std::endl;
+        }
     }
     return 0;
 }
