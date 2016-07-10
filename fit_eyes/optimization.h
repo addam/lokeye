@@ -27,10 +27,14 @@ protected:
 
 struct Face
 {
-    /** Region in reference space
+    /** Regions in reference space
      */
-    Region region;
+    Region main_region;
+    Region eye_region;
+    Region nose_region;
     
+    /** Eyes in eye space
+     */
     std::array<Eye, 2> eyes;
     
     /** Reference image
@@ -39,18 +43,17 @@ struct Face
     
     /** Transformation from reference to view space
      */
-    Transformation tsf;
+    Transformation main_tsf;
+    Transformation eye_tsf;
+    Transformation nose_tsf;
     
     Matrix eigenfaces;
     Matrix subspace;
     
-    Face(const Bitmap3 &ref, Region region, Eye left_eye, Eye right_eye) : ref{ref.clone()}, tsf{region}, region{region}, eyes{left_eye, right_eye} {
-    }
+    Face(const Bitmap3 &ref, Region main, Region eye, Region nose, Eye, Eye);
     Vector3 update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const;
     void refit(const Bitmap3&, bool only_eyes=false);
     Vector4 operator() (const Bitmap3&) const;
-    Matrix appearance(const Bitmap3&, const Transformation&) const;
-    void record_appearance(const Bitmap3&, bool do_recalculate=false);
     void render(const Bitmap3&) const;
 };
 

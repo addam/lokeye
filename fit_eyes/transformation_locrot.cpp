@@ -13,6 +13,14 @@ Transformation::Transformation(Params params, Vector3 static_params) : static_pa
 {
 }
 
+Transformation& Transformation::operator = (const Transformation &other)
+{
+    Vector2 zero(0, 0);
+    Vector2 translation = other(zero) - ((*this)(zero) - Vector2(params[0], params[1]));
+    float angle = static_params[2] * other.params[2] / other.static_params[2];
+    params = {translation[0], translation[1], angle};
+}
+
 Transformation Transformation::operator + (Params delta) const
 {
     return Transformation(params + delta, static_params);
@@ -26,7 +34,7 @@ Transformation& Transformation::operator += (Params delta)
 
 Vector2 Transformation::operator () (Vector2 v) const
 {
-    float angle = 3 * params[2] / static_params[2], s = sin(angle), c = cos(angle);
+    float angle = 3.14 * params[2] / static_params[2], s = sin(angle), c = cos(angle);
     Matrix22 rot = {c, -s, s, c};
     v = Vector2(v[0] - static_params[0], v[1] - static_params[1]);
     return Vector2(params[0], params[1]) + rot * v;
@@ -61,6 +69,11 @@ Region Transformation::operator () (Region region) const
         }
     }
     return {new_tl, new_br};
+}
+
+Vector2 Transformation::operator - (const Transformation &other) const
+{
+    return Vector2(params[0] - other.params[0], params[1] - other.params[1]);
 }
 
 Transformation Transformation::inverse() const

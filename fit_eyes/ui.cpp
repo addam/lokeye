@@ -10,11 +10,11 @@ void onMouse(int, int, int, int, void*);
 
 struct State
 {
+    using Drag = std::pair<Pixel, Pixel>;
     const char *winname;
     const Bitmap3 &canvas;
-    Pixel begin, end;
-    vector<Eye> eyes;
-    bool has_rectangle = false;
+    vector<Drag> record;
+    const std::array<bool, 5> is_rectangle{{true, true, true, false, false}};
     bool pressed = false;
     State(const char *winname, const Bitmap3 &img) : winname{winname}, canvas{img} {
         cv::namedWindow(winname);
@@ -26,16 +26,26 @@ struct State
     }
     void render() const {
         Bitmap3 result = canvas.clone();
-        if (has_rectangle) {
-            cv::rectangle(result, begin, end, cv::Scalar(0, 1.0, 1.0));
-        }
-        for (const Eye &eye : eyes) {
-            cv::circle(result, to_pixel(eye.pos), eye.radius, cv::Scalar(0.5, 1.0, 0));
+        for (int i=0; i<record.size(); ++i) {
+            const Drag &d = record[i];
+            if (is_rectangle[i]) {
+                cv::rectangle(result, d.first, d.second, cv::Scalar(0, 1.0, 1.0));
+            } else {
+                cv::circle(result, d.first, cv::norm(d.second - d.first), cv::Scalar(0.5, 1.0, 0));
+            }
         }
         cv::imshow(winname, result);
     }
+    Eye eye(int index) const {
+        assert (not is_rectangle.at(index));
+        return Eye(to_vector(record[index].first), cv::norm(record[index].second - record[index].first));
+    }
+    Region region(int index) const {
+        assert (is_rectangle.at(index));
+        return Region{record[index].first, record[index].second};
+    }
     bool done() const {
-        return has_rectangle and eyes.size() >= 2 and not pressed;
+        return not pressed and record.size() >= is_rectangle.size();
     }
 };
 
@@ -45,21 +55,13 @@ void onMouse(int event, int x, int y, int, void* param)
     State &state = *static_cast<State*>(param);
     if (event == cv::EVENT_LBUTTONDOWN) {
         state.pressed = true;
-    } else if (event == cv::EVENT_LBUTTONUP) {
+        state.record.emplace_back(std::make_pair(pos, pos));
+    } else if (event == cv::EVENT_MOUSEMOVE and state.pressed) {
+        state.record.back().second = pos;
+        state.render();
+    } else if (event == cv::EVENT_LBUTTONUP and state.pressed) {
         state.pressed = false;
-    }
-    if (event == cv::EVENT_LBUTTONDOWN and not state.has_rectangle) {
-        state.begin = pos;
-    } else if (event == cv::EVENT_LBUTTONDOWN and state.has_rectangle) {
-        state.eyes.emplace_back(Eye{to_vector(pos), 1.0f});
-    } else if (event == cv::EVENT_MOUSEMOVE and state.pressed and state.eyes.empty()) {
-        state.end = pos;
-        state.has_rectangle = true;
-    } else if (event == cv::EVENT_MOUSEMOVE and state.pressed and not state.eyes.empty()) {
-        Eye &eye = state.eyes.back();
-        eye.radius = cv::norm(eye.pos - to_vector(pos));
-    }
-    if (state.pressed or event == cv::EVENT_LBUTTONUP) {
+        state.record.back().second = pos;
         state.render();
     }
 }
@@ -74,19 +76,27 @@ Face mark_eyes(Bitmap3 &img)
             exit(0);
         }
     } while (not state.done());
-    Face result{img, Region{state.begin, state.end}, state.eyes[0], state.eyes[1]};
+    Face result{img, state.region(0), state.region(1), state.region(2), state.eye(3), state.eye(4)};
     return result;
 }
 
-void Face::render(const Bitmap3 &image) const {
-    Bitmap3 result = image.clone();
+void render_region(Region region, Transformation tsf, Bitmap3 &canvas)
+{
     std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
-    std::for_each(vertices.begin(), vertices.end(), [this](Vector2 &v) { v = tsf(v); });
+    std::for_each(vertices.begin(), vertices.end(), [tsf](Vector2 &v) { v = tsf(v); });
     for (int i = 0; i < 4; i++) {
-        cv::line(result, to_pixel(vertices[i]), to_pixel(vertices[(i+1)%4]), cv::Scalar(0, 1.0, 1.0));
+        cv::line(canvas, to_pixel(vertices[i]), to_pixel(vertices[(i+1)%4]), cv::Scalar(0, 1.0, 1.0));
     }
+}
+
+void Face::render(const Bitmap3 &image) const
+{
+    Bitmap3 result = image.clone();
+    render_region(main_region, main_tsf, result);
+    render_region(eye_region, eye_tsf, result);
+    render_region(nose_region, nose_tsf, result);
     for (const Eye &eye : eyes) {
-        cv::circle(result, to_pixel(tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+        cv::circle(result, to_pixel(eye_tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
     }
     const float font_size = 1;
     for (int i=0; i<2; i++) {
@@ -127,22 +137,13 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             cv::circle(canvas, to_pixel(point), 50, cv::Scalar(0, 0.6, 1), -1);
             cv::circle(canvas, to_pixel(point), 5, cv::Scalar(0, 0, 0.3), -1);
             cv::imshow(winname, canvas);
-            bool do_recalc_gaze = measurements.size() % 9 == 0 and measurements.size() >= necessary_support;
             if (not task.first.empty()) {
                 face.refit(task.first);
                 face.render(task.first);
-                memory.emplace_back(std::make_pair(task.first, face.tsf));
                 measurements.emplace_back(std::make_pair(face(task.first), task.second));
-                face.record_appearance(task.first, do_recalc_gaze);
             }
+            bool do_recalc_gaze = measurements.size() % 9 == 0 and measurements.size() >= necessary_support;
             if (do_recalc_gaze) {
-                for (int i=0; i<measurements.size(); ++i) {
-                    std::pair<Bitmap3, Transformation> &s = memory[i];
-                    Vector4 &m = measurements[i].first;
-                    Vector2 a = face.appearance(s.first, s.second);
-                    m[2] = a[0];
-                    m[3] = a[1];
-                }
                 int support = necessary_support;
                 const float precision = 150;
                 std::cout << "starting to solve..." << std::endl;

@@ -54,11 +54,13 @@ struct Transformation
     Transformation();
     Transformation(Region region);
     Transformation(Params, Vector3);
+    Transformation& operator = (const Transformation&);
     Transformation operator + (Params) const;
     Transformation& operator += (Params);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
     Region operator () (Region) const;
+    Vector2 operator - (const Transformation&) const;
     Transformation inverse() const;
     Vector2 inverse(Vector2) const;
     Matrix23 grad(Vector2) const;

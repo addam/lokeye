@@ -197,16 +197,26 @@ Vector2 Gaze::operator () (Vector4 v) const
     return project(v, fn);
 }
 
+Face::Face(const Bitmap3 &ref, Region main_region, Region eye_region, Region nose_region, Eye left_eye, Eye right_eye):
+    ref{ref.clone()},
+    main_tsf{main_region},
+    main_region{main_region},
+    eye_region{eye_region},
+    nose_region{nose_region},
+    eyes{left_eye, right_eye}
+{
+}
+
 Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const
 {
     Vector3 result = {0, 0, 0};
     // formula : delta_tsf = -sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
-    Transformation tsf_inv = tsf.inverse();
+    Transformation tsf_inv = main_tsf.inverse();
     for (Pixel p : grad) {
         Vector2 v = grad.to_world(p), refv = tsf_inv(v);
-        if (region.contains(to_pixel(refv))) {
+        if (main_region.contains(to_pixel(refv))) {
             Vector3 diff = img(v) - reference(refv);
-            result -= diff.dot(grad(p)) * tsf.d(refv, direction);
+            result -= diff.dot(grad(p)) * main_tsf.d(refv, direction);
         }
     }
     return result;
@@ -289,8 +299,8 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
         const int min_size = 10;
         const int iteration_count = 30;
         const float epsilon = 1e-3;
-        Region rotregion = tsf(region);
-        vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
+        Region rotregion = main_tsf(main_region);
+        vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(main_region))};
         while (pyramid.back().second.rows > min_size and pyramid.back().second.cols > min_size) {
             auto &pair = pyramid.back();
             pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
@@ -298,34 +308,37 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
         while (not pyramid.empty()) {
             auto &pair = pyramid.back();
             Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
-            float prev_energy = evaluate(tsf, pair.first, pair.second);
+            float prev_energy = evaluate(main_tsf, pair.first, pair.second);
             float max_length;
             for (int iteration=0; iteration < iteration_count; ++iteration) {
                 Vector3 delta_tsf = update_step(pair.first, dx, pair.second, 0) + update_step(pair.first, dy, pair.second, 1);
                 if (iteration == 0) {
-                    max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
+                    max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, main_tsf);
                 }
-                float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
+                float length = line_search(delta_tsf, max_length, prev_energy, main_tsf, pair.first, pair.second);
                 if (length > 0) {
-                    tsf += delta_tsf * length;
+                    main_tsf += delta_tsf * length;
                 } else {
                     break;
                 }
             }
             pyramid.pop_back();
         }
+        eye_tsf = main_tsf;
+        nose_tsf = main_tsf;
     }
     for (Eye &eye : eyes) {
-        eye.init(img, tsf);
-        eye.refit(img, tsf);
+        eye.init(img, eye_tsf);
+        eye.refit(img, eye_tsf);
     }
 }
 
 Vector4 Face::operator () (const Bitmap3 &image) const
 {
     const Vector2 e = eyes[0].pos + eyes[1].pos;
-    const Matrix a = appearance(image, tsf);
-    return Vector4(e[0], e[1], a(0, 0), a(1, 0));
+    /// @note here, we are assuming that Transformation is linear
+    Vector2 difference = main_tsf.inverse(nose_tsf - eye_tsf);
+    return Vector4(e[0], e[1], difference[0], difference[1]);
 }
 
 inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
@@ -410,75 +423,3 @@ float Eye::sum_boundary_dp(const Bitmap1 &derivative, bool is_vertical, const Tr
     }
     return sum_weight > 0 ? result / sum_weight : 0;
 }
-
-Matrix remap(const Bitmap3 &image, Region region, const Transformation &tsf)
-{
-    Bitmap3 warp(to_rect(region));
-    int n = 0;
-    Color mean(0, 0, 0), variance(0, 0, 0);
-    for (Pixel p : warp) {
-        Color value = warp(p) = image(tsf(warp.to_world(p)));
-        n += 1;
-        variance += pow2(mean - value) * (n - 1) / n;
-        mean += (value - mean) / n;
-    }
-    Color stddev = sqrt(variance / n);
-    for (Pixel p : warp) {
-        warp(p) = (warp(p) - mean) / stddev;
-    }
-    Matrix result = warp.reshape(1, 1);
-    return result;
-}
-
-void Face::record_appearance(const Bitmap3 &image, bool do_recalculate)
-{
-    eigenfaces.push_back(remap(image, region, tsf));
-    if (do_recalculate) {
-        subspace = cv::PCA(eigenfaces, cv::noArray(), cv::PCA::DATA_AS_ROW, 2).eigenvectors;
-    }
-}
-
-Matrix Face::appearance(const Bitmap3 &image, const Transformation &transformation) const
-{
-    Matrix result;
-    if (not subspace.empty()) {
-        Matrix warp = remap(image, region, transformation);
-        result = Matrix(subspace * warp.t());
-    }
-    for (int i=0; i<result.rows; ++i) {
-        if (not std::isfinite(result(i))) {
-            result(i) = 0;
-        }
-    }
-    return result;
-}
-
-
-#ifdef UNUSED
-float Eye::sum_boundary_dr(const Bitmap1 &img, const Transformation &tsf)
-{
-    Vector2 center = tsf(pos);
-    /// @todo use derivative of tsf wrt. x, y
-    float scale = 1;
-    float result = 0;
-    float sum_weight = 0;
-    for (Pixel p : region(tsf) & img.region()) {
-        float dist_x = (p.x - center[0]) / scale;
-        float dist_y = (p.y - center[1]) / scale;
-        float w = 1 - std::abs(std::sqrt(pow2(dist_x) + pow2(dist_y)) - radius);
-        if (w > 0) {
-            result += w * cv::sum(img.d(D::XX, p) * pow2(dist_x) + 2 * img.d(D::XY, p) * dist_x * dist_y + img.d(D::YY, p) * pow2(dist_y * dist_y))[0] / pow2(radius);
-            sum_weight += w;
-        }
-    }
-    return sum_weight > 0 ? result / sum_weight : 0;
-}
-
-Region Eye::region(const Transformation &tsf) const
-{
-    Vector2 center = tsf(pos);
-    /// @todo use derivative of tsf wrt. x, y
-    float scale = 1;
-    return Rect(center[0] - radius * scale, center[1] - radius * scale, 2 * radius * scale + 2, 2 * radius * scale + 2);
-}
-#endif
