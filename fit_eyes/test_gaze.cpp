@@ -11,12 +11,15 @@ Matrix35 random_homography()
 vector<Measurement> generate_correspondences(const Matrix35 &h, int count)
 {
     vector<Measurement> result;
+    Vector4 shift;
+    cv::randu(shift, -1e4, 1e4);
     for (int i=0; i<count; ++i) {
         Vector4 x;
         cv::randu(x, -1, 1);
         x[2] *= 100;
         x[3] = x[2];
         x[1] = x[0];
+        x += shift;
         Vector2 y;
         cv::randu(y, -1e-3, 1e-3);
         y += dehomogenize(h * homogenize(x));
@@ -28,12 +31,16 @@ vector<Measurement> generate_correspondences(const Matrix35 &h, int count)
 vector<Measurement> generate_random(int count)
 {
     vector<Measurement> result;
+    Vector4 shift_x;
+    cv::randu(shift_x, -1e4, 1e4);
+    Vector2 shift_y;
+    cv::randu(shift_y, -1e4, 1e4);
     for (int i=0; i<count; ++i) {
         Vector4 x;
-        cv::randu(x, -1, 1);
+        cv::randu(x, -100, 100);
         Vector2 y;
-        cv::randu(y, -1, 1);
-        result.push_back(std::make_pair(x, y));
+        cv::randu(y, -100, 100);
+        result.push_back(std::make_pair(x + shift_x, y + shift_y));
     }
     return result;
 }
@@ -56,8 +63,8 @@ int main(int argc, char** argv)
         }
         //std::cout << "support " << support << ", " << duration << " seconds" << std::endl;
     }
-    for (int i=5; i<9; ++i) {
-        auto sample = generate_random(i);
+    for (int i=5; i<10; ++i) {
+        auto sample = generate_random((i == 9) ? 20 : i);
         int support = 5;
         Gaze fit(sample, support, 0.1);
         for (Measurement m : sample) {
