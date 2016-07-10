@@ -1,12 +1,16 @@
 # lokeye
 Lokeye is an eye tracker designed for use with customer grade web cameras (or similar).
-It is supposed to help people interact with their computer more comfortably.
+It is supposed to help people interact with their computer in a more comfortable manner.
 
 The program is yet in early development, there are no usable binaries.
 Moreover, it is the cornerstone of my diploma thesis meant for publishing in summer 2016, so please show a bit of scientific ethics when reusing the code.
 
 ## important files
-* `fit_eyes/` contains an implementation of eye and face tracking. The following two files are just old versions of the same code:
+* `fit_eyes/` contains an implementation of eye and face tracking.
+* `fit_eyes/test_face.cpp` is a real-time face and eye tracker. Initialization is done by hand, marking the face area and then both pupils.
+* `fit_eyes/main.cpp` is a real-time gaze tracker and the main file of this whole project. After marking the face and pupils, a calibration session starts. Upon calibration, eye movement is visualized on-screen.
+
+The following files are old and no longer maintained:
 * `transform.cpp` can visualize and rotate a depth-mapped photograph in camera projection.
   It can also evaluate an error metric against reference photo and should minimize this error automatically.
 * `label.cpp` performs a local fitting to circular edges in a photograph.

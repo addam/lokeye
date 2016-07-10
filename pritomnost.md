@@ -1,6 +1,6 @@
 # Aktuální plán a TODO list
 
-poslední změna: 2. července
+poslední změna: 10. července
 
 ## Optimalizaci nechat na knihovně Ceres
 Ceres nabízí několik klasických algoritmů pro nelineární optimalizaci. Derivace si počítá sama, a to zčásti už během kompilace. Docela jistě prospěje přesnosti výpočtu, namísto metody největšího spádu s krokem pevné délky, jak ho používám teď.
@@ -10,11 +10,14 @@ Neprospěje. Výpočet nefunguje a kód je spíš ošklivější, než byl dří
 ## Zohlednit natočení hlavy
 Můžeme sice předpokládat, že se uživatel dívá na monitor přímo, ale i malé otočení hlavy má na výsledky obrovský vliv. V neměnném směrovém osvětlení by mohlo stačit otáčení hlavy modelovat jako lineární kombinaci obrázků, na způsob eigenfaces. Rozlišení by mělo být dost hrubé, aby pohyb očí už nebyl vidět.
 
-Potud hotovo, ale nefunguje pak fitování gaze.
+Nestačí. Při difúzním osvětlení má otočení převážně nelineární vliv, takže sbíráme samý šum.
 
 Správnější přístup by byl odhadnout hloubkovou mapu a do modelu hlavy pak přidat ještě vliv optical flow. Při hrubém rozlišení by to mohlo být i docela stabilní. Řešily by se tak problémy s obroučkami brýlí, které akorát překážejí v oblasti u kořene nosu a nepředvídatelným způsobem čouhají do prostoru.
 
 Robustní model natočení celého obličeje by zároveň měl poskytnout odhad toho, jak aktuálně vypadají vnitřní koutky očí. To může hodně prospět přesnosti výpočtu.
+
+## Alternativa: sledovat pohyb nosu oproti očím
+Vyžaduje to krom oblasti obličeje a očí vyznačit na začátku ještě oblast nosu. Výpočet pak vlastně je řídký optical flow, kde oči budou jeden landmark a nos bude druhý; při otáčení hlavy očekáváme, že vznikne paralaxa, a tou rovnou nakrmíme výpočet směru pohledu. Jako vedlejší efekt se tak zároveň vyřeší následující bod.
 
 ## Hledat cíleně vnitřní koutky očí
 Porovnávání pohybu očí oproti celému obličeji je nesmírně nepřesné, když se uživatel začne divně tvářit. Z vlastního pozorování před zrcadlem vyplývá, že vnitřní koutky očí jsou docela pevně fixované na lebku (do textu diplomky opatřím podklady z učebnice anatomie). Aby výpočet zvládal prudké pohyby hlavy, hodí se ale celý obličej stejnak najít, jako první krok.
