@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
         state.refit(image);
         float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
-        std::cout << state.main_tsf.params << ", " << 1 / duration << " fps" << std::endl;
+        std::cout << "Main transformation: " << state.main_tsf.params << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
         time_start = std::chrono::high_resolution_clock::now();
         state.render(image);
     }

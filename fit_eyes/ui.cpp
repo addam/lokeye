@@ -140,7 +140,7 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
             if (not task.first.empty()) {
                 face.refit(task.first);
                 face.render(task.first);
-                measurements.emplace_back(std::make_pair(face(task.first), task.second));
+                measurements.emplace_back(std::make_pair(face(), task.second));
             }
             bool do_recalc_gaze = measurements.size() % 9 == 0 and measurements.size() >= necessary_support;
             if (do_recalc_gaze) {

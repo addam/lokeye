@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     Vector2 prev_pos(-1, -1);
     for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
         state.refit(image);
-        Vector2 pos = fit(state(image));
+        Vector2 pos = fit(state());
         //std::cout << "position: " << pos(0) << ", " << pos(1) << std::endl;
         state.render(image);
         if (inside(pos, size) and inside(prev_pos, size)) {

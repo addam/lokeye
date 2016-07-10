@@ -65,6 +65,13 @@ inline T Bitmap<T>::operator() (Vector2 world_pos) const
     return (1 - tb) * ((1 - lr) * top[left] + lr * top[right]) + tb * ((1 - lr) * bottom[left] + lr * bottom[right]);
 }
 
+template<typename T>
+bool Bitmap<T>::contains(Vector2 world_pos) const
+{
+    Pixel p = to_pixel(to_local(world_pos));
+    return p.x < DataType::cols and p.y < DataType::rows;
+}
+
 /// @todo quite probably, this copies data; that's wrong.
 template<typename T>
 Bitmap<T> Bitmap<T>::crop(Region region) const

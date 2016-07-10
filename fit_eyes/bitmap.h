@@ -34,9 +34,11 @@ public:
     
     /** Sample from this bitmap in world reference frame
      */
-    T operator () (Vector2 pos) const;
+    T operator () (Vector2) const;
     
-    bool read(VideoCapture &cap);
+    bool contains(Vector2) const;
+    
+    bool read(VideoCapture&);
 
     Bitmap<T> crop(Region) const;
     Bitmap<T> d(int direction, Rect rect=Rect()) const;

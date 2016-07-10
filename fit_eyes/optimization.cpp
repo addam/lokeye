@@ -207,16 +207,16 @@ Face::Face(const Bitmap3 &ref, Region main_region, Region eye_region, Region nos
 {
 }
 
-Vector3 Face::update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const
+Vector3 update_step(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &ref, int direction)
 {
     Vector3 result = {0, 0, 0};
     // formula : delta_tsf = -sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
-    Transformation tsf_inv = main_tsf.inverse();
+    Transformation tsf_inv = tsf.inverse();
     for (Pixel p : grad) {
         Vector2 v = grad.to_world(p), refv = tsf_inv(v);
-        if (main_region.contains(to_pixel(refv))) {
-            Vector3 diff = img(v) - reference(refv);
-            result -= diff.dot(grad(p)) * main_tsf.d(refv, direction);
+        if (ref.contains(refv)) {
+            Vector3 diff = img(v) - ref(refv);
+            result -= diff.dot(grad(p)) * tsf.d(refv, direction);
         }
     }
     return result;
@@ -293,39 +293,44 @@ float line_search(Vector3 delta_tsf, float &max_length, float &prev_energy, cons
     }
 }
 
+void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size=3)
+{
+    const int iteration_count = 30;
+    Region rotregion = tsf(region);
+    vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
+    while (pyramid.back().second.rows >= 2 * min_size and pyramid.back().second.cols >= 2 * min_size) {
+        auto &pair = pyramid.back();
+        pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
+    }
+    while (not pyramid.empty()) {
+        auto &pair = pyramid.back();
+        Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
+        float prev_energy = evaluate(tsf, pair.first, pair.second);
+        float max_length;
+        for (int iteration=0; iteration < iteration_count; ++iteration) {
+            Vector3 delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
+            if (iteration == 0) {
+                max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
+            }
+            float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
+            if (length > 0) {
+                tsf += delta_tsf * length;
+            } else {
+                break;
+            }
+        }
+        pyramid.pop_back();
+    }
+}
+
 void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
     if (not only_eyes) {
-        const int min_size = 10;
-        const int iteration_count = 30;
-        const float epsilon = 1e-3;
-        Region rotregion = main_tsf(main_region);
-        vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(main_region))};
-        while (pyramid.back().second.rows > min_size and pyramid.back().second.cols > min_size) {
-            auto &pair = pyramid.back();
-            pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
-        }
-        while (not pyramid.empty()) {
-            auto &pair = pyramid.back();
-            Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
-            float prev_energy = evaluate(main_tsf, pair.first, pair.second);
-            float max_length;
-            for (int iteration=0; iteration < iteration_count; ++iteration) {
-                Vector3 delta_tsf = update_step(pair.first, dx, pair.second, 0) + update_step(pair.first, dy, pair.second, 1);
-                if (iteration == 0) {
-                    max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, main_tsf);
-                }
-                float length = line_search(delta_tsf, max_length, prev_energy, main_tsf, pair.first, pair.second);
-                if (length > 0) {
-                    main_tsf += delta_tsf * length;
-                } else {
-                    break;
-                }
-            }
-            pyramid.pop_back();
-        }
+        refit_transformation(main_tsf, main_region, img, ref, 5);
         eye_tsf = main_tsf;
         nose_tsf = main_tsf;
+        refit_transformation(eye_tsf, eye_region, img, ref, 3);
+        refit_transformation(nose_tsf, nose_region, img, ref, 3);
     }
     for (Eye &eye : eyes) {
         eye.init(img, eye_tsf);
@@ -333,7 +338,7 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
     }
 }
 
-Vector4 Face::operator () (const Bitmap3 &image) const
+Vector4 Face::operator () () const
 {
     const Vector2 e = eyes[0].pos + eyes[1].pos;
     /// @note here, we are assuming that Transformation is linear

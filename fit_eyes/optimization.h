@@ -53,7 +53,7 @@ struct Face
     Face(const Bitmap3 &ref, Region main, Region eye, Region nose, Eye, Eye);
     Vector3 update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const;
     void refit(const Bitmap3&, bool only_eyes=false);
-    Vector4 operator() (const Bitmap3&) const;
+    Vector4 operator() () const;
     void render(const Bitmap3&) const;
 };
 
