@@ -49,7 +49,7 @@ struct Face
     Vector3 update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const;
     void refit(const Bitmap3&, bool only_eyes=false);
     Vector4 operator() (const Bitmap3&) const;
-    Vector2 appearance(const Bitmap3&, const Transformation&) const;
+    Matrix appearance(const Bitmap3&, const Transformation&) const;
     void record_appearance(const Bitmap3&, bool do_recalculate=false);
     void render(const Bitmap3&) const;
 };

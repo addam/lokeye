@@ -3,11 +3,13 @@
 #include "optimization.h"
 #include <iostream>
 
-vector<Measurement> grid_calibrate(Face &face, VideoCapture &cap, Pixel window_size)
+using DataPair = std::pair<Matrix, Vector2>;
+
+vector<DataPair> grid_calibrate(Face &face, VideoCapture &cap, Pixel window_size)
 {
     const int divisions_x = 16, divisions_y = 9;
     const char winname[] = "calibrate";
-    const Vector3 bgcolor(0.7, 0.6, 0.5);
+    const Vector3 bgcolor(1, 1, 1);//(0.7, 0.6, 0.5);
     Bitmap3 canvas(window_size.y, window_size.x);
     canvas = bgcolor;
     cv::namedWindow(winname);
@@ -20,7 +22,7 @@ vector<Measurement> grid_calibrate(Face &face, VideoCapture &cap, Pixel window_s
         int begin = points.size();
         for (int i=0; i<divisions_y; i++) {
             for (int j=0; j<divisions_x; j++) {
-                points.emplace_back(Vector2(j * cell[0], i * cell[1]));
+                points.emplace_back(Vector2(j * cell[0], i * cell[1]) + 0.5 * cell);
             }
         }
         std::shuffle(points.begin() + begin, points.end(), generator);
@@ -38,22 +40,24 @@ vector<Measurement> grid_calibrate(Face &face, VideoCapture &cap, Pixel window_s
         face.record_appearance(img, images.size() == points.size());
     }
     assert(images.size() == points.size());
-    vector<Measurement> result;
+    vector<DataPair> result;
     for (int i=0; i < images.size(); ++i) {
         const Bitmap3 &img = images[i];
         face.refit(img);
         face.render(img);
-        result.emplace_back(std::make_pair(face(img), points[i]));
+        result.emplace_back(std::make_pair(face.appearance(img, face.tsf), points[i]));
     }
     return result;
 }
 
-void write(const vector<Measurement> &data, std::ostream &ostr)
+void write(const vector<DataPair> &data, std::ostream &ostr)
 {
-    for (Measurement m : data) {
-        ostr << m.first[0] << ' ' << m.first[1] << std::endl;
-        ostr << m.second[0] << ' ' << m.second[1] << std::endl;
-        ostr << m.first[2] << ' ' << m.first[3] << std::endl;
+    for (DataPair m : data) {
+        ostr << m.second[0] << ' ' << m.second[1];
+        for (int i=0; i<m.first.rows; ++i) {
+            ostr << ' ' << m.first(i);
+        }
+        ostr << std::endl;
     }
 }
 

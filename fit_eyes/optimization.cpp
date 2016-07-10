@@ -50,7 +50,7 @@ void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
  */
 Matrix35 homography(const vector<Measurement> &pairs)
 {
-    Vector4 center_left(0, 0), variance_left(0, 0);
+    Vector4 center_left(0, 0, 0, 0), variance_left(0, 0, 0, 0);
     Vector2 center_right(0, 0), variance_right(0, 0);
     int count = 0;
     for (auto pair : pairs) {
@@ -144,16 +144,18 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
     for (int i=0; i < iterations; i++) {
         vector<Measurement> sample = random_sample<min_sample>(pairs);
         size_t prev_sample_size;
-        Matrix35 h;
+        Matrix35 h = homography(sample);
         do {
             prev_sample_size = sample.size();
             h = homography(sample);
             sample = support(h, pairs, precision);
         } while (sample.size() > prev_sample_size);
-        if (sample.size() > out_support and sample.size() >= necessary_support) {
+        if (sample.size() > out_support) {
             out_support = sample.size();
             fn = h;
-            iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());
+            if (sample.size() >= necessary_support) {
+                iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());
+            }
         }
     }
     printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
@@ -291,8 +293,8 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
 Vector4 Face::operator () (const Bitmap3 &image) const
 {
     const Vector2 e = eyes[0].pos + eyes[1].pos;
-    const Vector2 a = appearance(image, tsf);
-    return Vector4(e[0], e[1], a[0], a[1]);
+    const Matrix a = appearance(image, tsf);
+    return Vector4(e[0], e[1], a(0, 0), a(1, 0));
 }
 
 inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
@@ -405,12 +407,17 @@ void Face::record_appearance(const Bitmap3 &image, bool do_recalculate)
     }
 }
 
-Vector2 Face::appearance(const Bitmap3 &image, const Transformation &transformation) const
+Matrix Face::appearance(const Bitmap3 &image, const Transformation &transformation) const
 {
-    Vector2 result;
+    Matrix result;
     if (not subspace.empty()) {
         Matrix warp = remap(image, region, transformation);
         result = Matrix(subspace * warp.t());
+    }
+    for (int i=0; i<result.rows; ++i) {
+        if (not std::isfinite(result(i))) {
+            result(i) = 0;
+        }
     }
     return result;
 }
