@@ -38,11 +38,15 @@ void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
         while (evaluate_homography(h - gradient * step_size, pairs) > value) {
             step_size /= 2;
             if (step_size < 1e-20) {
+                //printf("resulting value: %g; stop because step_size = %g\n", evaluate_homography(h, pairs), step_size);
                 return;
             }
         }
+        //printf("value after %i iterations: %g; choosing step %g\n", i, value, step_size);
+        //std::cout << gradient * step_size << std::endl;
         h -= gradient * step_size;
     }
+    //printf("resulting value: %g\n", evaluate_homography(h, pairs));
 }
 
 /** Direct linear transform from pair.first to pair.second
@@ -82,6 +86,7 @@ Matrix35 homography(const vector<Measurement> &pairs)
     Matrix35 result;
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
+    Matrix tmp_best_h;
     for (int i=0; i<15; ++i) {
         Matrix h = vt.row(i).reshape(1, 3);
         Matrix35 candidate = Matrix(denormalize * h * normalize);
@@ -89,11 +94,30 @@ Matrix35 homography(const vector<Measurement> &pairs)
         if (error < best_error) {
             best_error = error;
             result = candidate;
+            tmp_best_h = h;
         }
     }
+    static size_t prev_count = 0;
+    if (false and prev_count != pairs.size()) {
+        std::cout << "solving:\nin = [";
+        for (auto pair:pairs) {
+            std::cout << homogenize(pair.first) /*homogenize((pair.first - center_left) / stddev_left)*/ << ';' << std::endl;
+        }
+        std::cout << "]';\nout = [";
+        for (auto pair:pairs) {
+            std::cout << homogenize(pair.second) /*homogenize((pair.second - center_right) / stddev_right)*/ << ';' << std::endl;
+        }
+        std::cout << "]';\n";
+        std::cout << "system = " << system << ';' << std::endl;
+        auto svd = cv::SVD(system, cv::SVD::FULL_UV);
+        std::cout << "u:\n" /*<< svd.u*/ << "\nd:\n" << svd.w << "\nvt:\n" << svd.vt << std::endl;
+        std::cout << "result\n" << denormalize << " * " << tmp_best_h << " * " << normalize << std::endl;
+        prev_count = pairs.size();
     }
     if (pairs.size() > 7) {
+        //printf("initial %g, ", evaluate_homography(result, pairs));
         refit_homography(result, pairs);
+        //printf("final %g\n", evaluate_homography(result, pairs));
     }
     return result;
 }
@@ -131,12 +155,19 @@ float combinations_ratio(int count_total, int count_good)
 {
     const float logp = -1;
     float result = logp / std::log(1 - pow(count_good / float(count_total), count));
-    //printf(" need %g iterations (%i over %i)\n", result, count_good, count_total);
+    printf(" need %g samples (%i over %i)\n", result, count_good, count_total);
     return result;
 }
 
 Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
 {
+    if (false) {
+        vector<Measurement> subpairs = random_sample<8>(pairs);//(pairs.begin(), pairs.begin() + 7);
+        fn = homography(subpairs);
+        out_support = support(fn, pairs, precision).size();
+        printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
+        return;
+    }
     const int necessary_support = std::min(out_support, int(pairs.size()));
     out_support = 0;
     const int min_sample = 7;

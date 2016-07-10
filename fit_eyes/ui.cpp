@@ -143,14 +143,15 @@ Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
                     m[2] = a[0];
                     m[3] = a[1];
                 }
-                int support;
-                const float precision = 50;
+                int support = necessary_support;
+                const float precision = 150;
+                std::cout << "starting to solve..." << std::endl;
                 Gaze result(measurements, support, precision);
-                if (support >= necessary_support) {
-                    cv::destroyWindow(winname);
                     for (auto pair : measurements) {
                         std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << ((cv::norm(result(pair.first) - pair.second) < precision) ? " INLIER" : " out") << std::endl;
                     }
+                if (support >= necessary_support) {
+                    cv::destroyWindow(winname);
                     return result;
                 }
             }
