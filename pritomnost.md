@@ -22,6 +22,8 @@ Vyžaduje to krom oblasti obličeje a očí vyznačit na začátku ještě oblas
 ## Hledat cíleně vnitřní koutky očí
 Porovnávání pohybu očí oproti celému obličeji je nesmírně nepřesné, když se uživatel začne divně tvářit. Z vlastního pozorování před zrcadlem vyplývá, že vnitřní koutky očí jsou docela pevně fixované na lebku (do textu diplomky opatřím podklady z učebnice anatomie). Aby výpočet zvládal prudké pohyby hlavy, hodí se ale celý obličej stejnak najít, jako první krok.
 
+Potud hotovo.
+
 ## Zohlednit víčka
 Program hledá obrys duhovky (angl. limbus) jako kružnici s tmavým vnitřkem. Přitom, i když se uživatel dívá skoro přímo do kamery, je zhruba půlka obrysu zakrytá víčky, a to patrně zkresluje výsledek. Robustnější chybová funkce pro oko by tedy měla na obrysu určit i váhovou funkci, která bude na víčku nulová. Jedno řešení je víčka explicitně modelovat, což by bylo užitečné i pro hledání koutků očí. O něco jednodušší možná bude předpokládat, že obrys duhovky má celý stejnou barvu, tu nějakým způsobem robustně odhadnout a na jejím základě klasifikovat každý pixel jednotlivě.
 
