@@ -1,12 +1,15 @@
 CXX = g++
 OPTIMIZE = -O2 -ffast-math -march=native
 CXXFLAGS = $(OPTIMIZE) -std=c++11 -fopenmp
+LDFLAGS = $(LIBS) -L/usr/local/lib
+TRANSFORMATION = affine
+OBJ_TRANSFORMATION = transformation_$(TRANSFORMATION).o
+OBJ_OPTIMIZATION = optimization.o
+CXXFLAGS += -DTSF_HEADER='"transformation_'$(TRANSFORMATION)'.h"'
 
 LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
 # -lceres -lglog
-LDFLAGS = $(LIBS) -L/usr/local/lib
-OBJ_OPTIMIZATION = optimization.o
-OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) transformation_locrot.o
+OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION)
 BIN = fit_eyes
 
 all: $(BIN)
@@ -15,11 +18,11 @@ $(BIN): $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 test_bitmap: bitmap.o
-test_main: bitmap.o transformation_locrot.o
-test_face: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION) ui.o
-test_eigenface: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION) ui.o
-test_gaze: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION)
-test_grid_calibrate: bitmap.o transformation_locrot.o $(OBJ_OPTIMIZATION) ui.o
+test_main: bitmap.o $(OBJ_TRANSFORMATION)
+test_face: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
+test_eigenface: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
+test_gaze: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
+test_grid_calibrate: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
 test_%: test_%.cpp
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 

@@ -46,26 +46,4 @@ inline float pow2(float x)
     return x*x;
 }
 
-struct Transformation
-{
-    using Params = Vector3;
-    const Vector3 static_params;
-    Params params;
-    Transformation();
-    Transformation(Region region);
-    Transformation(Params, Vector3);
-    Transformation& operator = (const Transformation&);
-    Transformation operator + (Params) const;
-    Transformation& operator += (Params);
-    Vector2 operator () (Vector2) const;
-    Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
-    Region operator () (Region) const;
-    Vector2 operator - (const Transformation&) const;
-    Transformation inverse() const;
-    Vector2 inverse(Vector2) const;
-    Matrix23 grad(Vector2) const;
-    Matrix23 grad(Pixel p) const { return this->grad(to_vector(p)); }
-    Vector3 d(Vector2, int direction) const;
-};
-
 #endif // MAIN_H

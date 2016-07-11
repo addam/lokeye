@@ -1,5 +1,6 @@
 #ifndef OPTIMIZATION_H
 #define OPTIMIZATION_H
+#include TSF_HEADER
 
 using Measurement = std::pair<Vector4, Vector2>;
 

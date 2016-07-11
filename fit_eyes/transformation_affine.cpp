@@ -1,5 +1,5 @@
 #include "main.h"
-#include "transformation_locrot.h"
+#include "transformation_affine.h"
 
 using Params = Transformation::Params;
 
@@ -8,24 +8,26 @@ inline Vector2 extract_translation(Params p)
     return Vector2(p[0], p[1]);
 }
 
-inline float extract_angle(Params p)
+inline Matrix22 extract_matrix(Params p)
 {
-    return p[2];
+    return Matrix22(p[2], p[3], p[4], p[5]);
 }
 
 Transformation::Transformation():
     static_params(Vector2(0, 0), 1),
-    params(Vector2(0, 0), 1)
+    params(std::make_pair(Vector2(0, 0), Matrix22(1, 0, 0, 1)))
 {
 }
 
 Transformation::Transformation(Region region):
-    static_params((region.tl() + region.br()) / 2, cv::norm(region.br() - region.tl())),
-    params(static_params.first, 0)
+    static_params((region.tl() + region.br()) / 2, 1. / cv::norm(region.br() - region.tl())),
+    params(static_params.first, (1. / static_params.second) * Matrix22::eye())
 {
 }
 
-Transformation::Transformation(decltype(params) params, decltype(static_params) static_params) : static_params(static_params), params(params)
+Transformation::Transformation(decltype(params) params, decltype(static_params) static_params):
+    static_params(static_params),
+    params(params)
 {
 }
 
@@ -33,7 +35,7 @@ Transformation& Transformation::operator = (const Transformation &other)
 {
     Vector2 zero(0, 0);
     params.first += other(zero) - (*this)(zero);
-    params.second = static_params.second * other.params.second / other.static_params.second;
+    params.second = (other.static_params.second / static_params.second) * other.params.second;
     return *this;
 }
 
@@ -47,24 +49,20 @@ Transformation Transformation::operator + (Params delta) const
 Transformation& Transformation::operator += (Params delta)
 {
     params.first += extract_translation(delta);
-    params.second += extract_angle(delta);
+    params.second += extract_matrix(delta);
     return *this;
 }
 
 Vector2 Transformation::operator () (Vector2 v) const
 {
-    float s, c;
-    sincos(s, c);
-    Matrix22 rot = {c, -s, s, c};
-    return params.first + rot * (v - static_params.first);
+    return params.first + static_params.second * params.second * (v - static_params.first);
 }
 
 Params Transformation::d(Vector2 v, int direction) const
 {
-    float s, c, coef;
-    sincos(s, c, coef);
     v -= static_params.first;
-    return (direction == 0) ? Params{1, 0, coef * (-v[0] * s - v[1] * c)} : Params{0, 1, coef * (v[0] * c - v[1] * s)};
+    float coef = static_params.second;
+    return (direction == 0) ? Params{1, 0, coef * v[0], coef * v[1], 0, 0} : Params{0, 1, 0, 0, coef * v[0], coef * v[1]};
 }
 
 Region Transformation::operator () (Region region) const
@@ -90,25 +88,11 @@ Vector2 Transformation::operator - (const Transformation &other) const
 Transformation Transformation::inverse() const
 {
     decltype(static_params) inverse_static_params(params.first, static_params.second);
-    decltype(params) inverse_params(static_params.first, -params.second);
+    decltype(params) inverse_params(Vector2(static_params.first(0), static_params.first(1)), pow2(1. / static_params.second) * params.second.inv());
     return Transformation(inverse_params, inverse_static_params);
 }
 
 Vector2 Transformation::inverse(Vector2 v) const
 {
     return inverse()(v);
-}
-
-void Transformation::sincos(float &s, float &c) const
-{
-    float dummy;
-    sincos(s, c, dummy);
-}
-
-void Transformation::sincos(float &s, float &c, float &coef) const
-{
-    coef = 3.14f / static_params.second;
-    float angle = coef * params.second;
-    s = sin(angle);
-    c = cos(angle);
 }

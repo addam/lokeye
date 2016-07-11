@@ -207,9 +207,9 @@ Face::Face(const Bitmap3 &ref, Region main_region, Region eye_region, Region nos
 {
 }
 
-Vector3 update_step(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &ref, int direction)
+Transformation::Params update_step(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &ref, int direction)
 {
-    Vector3 result = {0, 0, 0};
+    Transformation::Params result;
     // formula : delta_tsf = -sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
     Transformation tsf_inv = tsf.inverse();
     for (Pixel p : grad) {
@@ -238,7 +238,7 @@ float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref
  * @param step Differential update of the transformation
  * @param r Region of interest (search domain for the maximum)
  */
-float step_length(Vector3 step, Region r, const Transformation &tsf)
+float step_length(Transformation::Params step, Region r, const Transformation &tsf)
 {
     Vector2 points[] = {to_vector(r.tl()), Vector2(r.tl().x, r.br().y), to_vector(r.br()), Vector2(r.br().x, r.tl().y)};
     float result = 1e-5;
@@ -271,7 +271,7 @@ float quadratic_minimum(float f0, float f1, float df0)
     }
 }
 
-float line_search(Vector3 delta_tsf, float &max_length, float &prev_energy, const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref)
+float line_search(Transformation::Params delta_tsf, float &max_length, float &prev_energy, const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref)
 {
     const float epsilon = 1e-5;
     float length = max_length;
@@ -308,7 +308,7 @@ void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img
         float prev_energy = evaluate(tsf, pair.first, pair.second);
         float max_length;
         for (int iteration=0; iteration < iteration_count; ++iteration) {
-            Vector3 delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
+            Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
             if (iteration == 0) {
                 max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
             }
