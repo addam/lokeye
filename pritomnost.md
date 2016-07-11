@@ -24,6 +24,12 @@ Porovnávání pohybu očí oproti celému obličeji je nesmírně nepřesné, k
 
 Potud hotovo.
 
+## Afinní transformace obličeje
+Shodnost funguje dobře, dokud se obličej hýbe jen v rovině kolmé na kameru. Otáčení hlavou má už citelné perspektivní zkreslení. Ze zkušeností s trackováním v Blenderu mám obavu, že perspektivita by se příliš pečlivě chytala na nepodstatné změny jako osvětlení a šířka úsměvu. Afinita má navíc skoro stejné vzorečky jako shodnost, takže bude radost ji optimalizovat.
+
+## Normalizace vůči světlosti a kontrastu
+Jednak změny osvětlení a druhak automatické změny závěrky na webkameře můžou hledání obličeje docela zbourat. Normalizace světlosti uvnitř obličeje by měla tyhle problémy vyřešit. Asi nemá smysl tu normalizační funkci derivovat, to by bylo děsně složité; světlost obličeje změním před výpočtem jakoby mimochodem. Aby při posuvu obličeje nemohly výsledky moc skákat, posadím doprostřed obličeje gaussovský kernel a budu jím pixely vážit.
+
 ## Zohlednit víčka
 Program hledá obrys duhovky (angl. limbus) jako kružnici s tmavým vnitřkem. Přitom, i když se uživatel dívá skoro přímo do kamery, je zhruba půlka obrysu zakrytá víčky, a to patrně zkresluje výsledek. Robustnější chybová funkce pro oko by tedy měla na obrysu určit i váhovou funkci, která bude na víčku nulová. Jedno řešení je víčka explicitně modelovat, což by bylo užitečné i pro hledání koutků očí. O něco jednodušší možná bude předpokládat, že obrys duhovky má celý stejnou barvu, tu nějakým způsobem robustně odhadnout a na jejím základě klasifikovat každý pixel jednotlivě.
 
@@ -31,3 +37,6 @@ Program hledá obrys duhovky (angl. limbus) jako kružnici s tmavým vnitřkem. 
 Aby šlo výpočet předvádět opakovaně s jednou natočeným videem, musí být možné napevno zvoli sekvenci fixací, jaká se ukazuje během kalibrace. Problém je se synchronizací; proto by možná bylo nejlepší údaje o kalibrační sekvenci i s čísly snímku někam uložit. Týž program může uložit i video z kamery, v OpenCV to není problém.
 
 ##takový program už by měl bohatě stačit.
+
+## Ukládání a načítání obličeje
+Kalibrace trvá dlouho. Pro pohodlí by hodně prospělo si její výsledky uložit na disk a při následujícím spuštění programu je zkusit použít. Asi budou potřeba nějaké další heuristiky, protože se osvětlení může měnit dost nepředvidatelným způsobem.
