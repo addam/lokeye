@@ -17,8 +17,9 @@ struct Eye
      */
     Vector2 pos;
     Vector2 init_pos;
+    float init_radius;
     float radius;
-    Eye(Vector2 pos, float radius) : pos{pos}, init_pos{pos}, radius{radius} {
+    Eye(Vector2 pos, float radius) : pos{pos}, init_pos{pos}, init_radius{radius}, radius{radius} {
     }
     void refit(const Bitmap3&, const Transformation&);
     void init(const Bitmap3&, const Transformation&);

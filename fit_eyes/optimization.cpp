@@ -361,6 +361,7 @@ inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
 
 void Eye::init(const Bitmap3 &img, const Transformation &tsf)
 {
+    radius = tsf.scale(init_pos) * init_radius;
     const float max_distance = 2 * radius;
     const int size = 2 * max_distance;
     Region region(tsf(init_pos) - Vector2(max_distance, max_distance), tsf(pos) + Vector2(max_distance, max_distance));

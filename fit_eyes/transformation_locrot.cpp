@@ -82,6 +82,11 @@ Region Transformation::operator () (Region region) const
     return {new_tl, new_br};
 }
 
+float Transformation::scale(Vector2) const
+{
+    return 1;
+}
+
 Vector2 Transformation::operator - (const Transformation &other) const
 {
     return (params.first - static_params.first) - (other.params.first - other.static_params.first);

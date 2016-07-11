@@ -1,5 +1,5 @@
-#ifndef TRANSFORMATION_AFFINE_H
-#define TRANSFORMATION_AFFINE_H
+#ifndef TRANSFORMATION_LOCROT_H
+#define TRANSFORMATION_LOCROT_H
 
 struct Transformation
 {
@@ -15,6 +15,7 @@ struct Transformation
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
     Region operator () (Region) const;
+    float scale(Vector2) const;
     Vector2 operator - (const Transformation&) const;
     Transformation inverse() const;
     Vector2 inverse(Vector2) const;
