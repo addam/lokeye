@@ -52,7 +52,10 @@ Přečetl jsem články:
   Pečlivý rozbor možných přístupů k rozpoznávání natočení hlavy. Zvlášť mě inspiruje skupina Manifold Embedding, algoritmus Adaptive Appearance Model a hybridní modely. Nečetl jsem všechny podrobnosti, ale zjevně jde celkově o vydatně probádanou oblast. Užitečné jsou reference na algoritmy a testovací databáze.
  * Head pose estimation using view based eigenspaces
   _Srinivasan, Sujith, and Kim L. Boyer in IEEE ?, 2002._
-  Sympaticky jednoduché řešení založené na PCA zmenšených obrázků. Vstupní obrázek se pak promítne postupně do eigenspace každého trénovacího kandidáta. Namísto přímého vyčtení úhlů z kandidáta s nejlepší shodou navrhují autoři krok s využitím hloubkové mapy, který nechápu. Výsledky opravují Kalmanovým filtrem.
+  Sympaticky jednoduché řešení založené na PCA zmenšených obrázků. Z trénovacích dat se vybudují eigenspaces podle natočení, napříč osobami. Vstupní obrázek se pak promítne do každého takového eigenspace. Namísto věštění z koeficientů se úhel vyčte z chyby každého (zhruba ze sedmi) eigenspace.
+ * Pose estimation using 3D view-based eigenspaces
+  _Morency, Sundberg, and Darrell in IEEE AMFG, 2003._
+  Z trénovacích obrázků s hloubkovou mapou se vybuduje docela masivní model mnoha eigenspaces pro kvantizované úhly. Vstupní obrázek se pak promítne do vhodného z nich a pokud je k dispozici hloubková mapa, doladí se i ta. Výsledky jsou pěkné, ale jsem z toho postupu poněkud zmatený.
  * Head pose estimation by nonlinear manifold learning
   _Raytchev, Bisser, Ikushi Yoda, and Katsuhiko Sakaue in IEEE ICPR 2004._
   Pěkný přístup pro případ, že je k dispozici dost trénovacích dat z různých úhlů. Bohužel se ten článek vyžívá ve stroze podané maticové aritmetice, takže jen matně chápu, co se děje. Základem je algoritmus Isomap, popsaný v následujícím článku; rozšíření zřejmě umožňuje přesně vyhodnotit parametry pro libovolná vstupní data.
