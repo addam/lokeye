@@ -3,34 +3,41 @@
 #include "optimization.h"
 #include <iostream>
 
-Matrix33 cross_axes(int i, int j)
+template<int N>
+cv::Matx<float, N, N> cross_axes(int i, int j)
 {
-    Matrix33 result = Matrix33::zeros();
+    cv::Matx<float, N, N> result = cv::Matx<float, N, N>::zeros();
     result(i, j) = 1;
     result(j, i) = -1;
     return result;
 }
 
-float evaluate_homography(const Matrix35 &h, const vector<Measurement> &pairs)
+template<int N, int M>
+float evaluate_homography(const cv::Matx<float, N, M> &h, const vector<std::pair<cv::Vec<float, M-1>, cv::Vec<float, N-1>>> &pairs)
 {
     float value = 0;
     for (auto pair : pairs) {
-        Vector2 p = project(pair.first, h);
+        cv::Vec<float, N-1> p = project(pair.first, h);
         value += cv::norm(p - pair.second, cv::NORM_L2SQR);
     }
     return 0.5 * value;
 }
 
-void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
+template<int N, int M>
+void refit_homography(cv::Matx<float, N, M> &h, const vector<std::pair<cv::Vec<float, M-1>, cv::Vec<float, N-1>>> &pairs)
 {
-    for (int i=0; i<10; i++) {
-        Matrix35 gradient = Matrix35::zeros();
+    using Homography = cv::Matx<float, N, M>;
+    for (int iteration=0; iteration<10; iteration++) {
+        Homography gradient = Matrix35::zeros();
         for (auto pair : pairs) {
-            Vector3 p = h * homogenize(pair.first);
-            Vector2 diff = Vector2{p[0] / p[2], p[1] / p[2]} - pair.second;
-            Vector3 delta_projection = {diff[0], diff[1], -(diff[0] + diff[1]) / p[2]};
-            Matrix35 gradient_piece = Matrix(Matrix(delta_projection) * Matrix(homogenize(pair.first)).t());
-            gradient += 0.5 * gradient_piece;
+            cv::Vec<float, N-1> projection = project(pair.first, h);
+            cv::Vec<float, N-1> diff = projection - pair.second;
+            cv::Vec<float, N> rowwise_component;
+            for (int i=0; i<N-1; i++) {
+                rowwise_component[i] = diff[i];
+                rowwise_component[N-1] -= diff[i] * projection[i];
+            }
+            gradient += Homography(Matrix(Matrix(rowwise_component) * Matrix(homogenize(pair.first)).t()));
         }
         float value = evaluate_homography(h, pairs);
         float grad_norm = cv::norm(gradient, cv::NORM_L2SQR);
@@ -50,12 +57,13 @@ void refit_homography(Matrix35 &h, const vector<Measurement> &pairs)
 }
 
 /** Direct linear transform from pair.first to pair.second
- * Beware: the input data is modified (normalized, to be exact) in the process
  */
-Matrix35 homography(const vector<Measurement> &pairs)
+template<int N, int M>
+cv::Matx<float, N, M> homography(const vector<std::pair<cv::Vec<float, M-1>, cv::Vec<float, N-1>>> &pairs)
 {
-    Vector4 center_left(0, 0, 0, 0), variance_left(0, 0, 0, 0);
-    Vector2 center_right(0, 0), variance_right(0, 0);
+    using Homography = cv::Matx<float, N, M>;
+    cv::Vec<float, M-1> center_left, variance_left;
+    cv::Vec<float, N-1> center_right, variance_right;
     int count = 0;
     for (auto pair : pairs) {
         count += 1;
@@ -64,33 +72,33 @@ Matrix35 homography(const vector<Measurement> &pairs)
         center_left += (pair.first - center_left) / count;
         center_right += (pair.second - center_right) / count;
     }
-    Vector4 stddev_left = sqrt(variance_left);
-    Vector2 stddev_right = sqrt(variance_right);
-    vector<Matrix33> constraints;
-    for (int i=1; i<3; ++i) {
+    cv::Vec<float, M-1> stddev_left = sqrt(variance_left);
+    cv::Vec<float, N-1> stddev_right = sqrt(variance_right);
+    vector<cv::Matx<float, N, N>> constraints;
+    for (int i=1; i<N; ++i) {
         for (int j=0; j<i; ++j) {
-            constraints.push_back(cross_axes(i, j));
+            constraints.push_back(cross_axes<N>(i, j));
         }
     }
-    Matrix system(0, 15);
+    Matrix system(0, N*M);
     for (auto pair : pairs) {
-        Vector5 lhs = homogenize((pair.first - center_left) / stddev_left);
-        Vector3 rhs = homogenize((pair.second - center_right) / stddev_right);
-        for (Matrix33 swap : constraints) {
+        auto lhs = homogenize((pair.first - center_left) / stddev_left);
+        auto rhs = homogenize((pair.second - center_right) / stddev_right);
+        for (auto swap : constraints) {
             auto row = Matrix(swap * rhs * lhs.t());
             system.push_back(row.reshape(1, 1));
         }
     }
     Matrix vt = cv::SVD(system, cv::SVD::FULL_UV).vt;
     float best_error = 1e20;
-    Matrix35 result;
+    Homography result;
     Matrix normalize = scaling(stddev_left, true) * translation(center_left, true);
     Matrix denormalize = translation(center_right) * scaling(stddev_right);
     Matrix tmp_best_h;
-    for (int i=0; i<15; ++i) {
-        Matrix h = vt.row(i).reshape(1, 3);
-        Matrix35 candidate = Matrix(denormalize * h * normalize);
-        float error = evaluate_homography(candidate, pairs);
+    for (int i=0; i<vt.rows; ++i) {
+        Matrix h = vt.row(i).reshape(1, N);
+        Homography candidate = Matrix(denormalize * h * normalize);
+        float error = evaluate_homography<N, M>(candidate, pairs);
         if (error < best_error) {
             best_error = error;
             result = candidate;
@@ -114,10 +122,10 @@ Matrix35 homography(const vector<Measurement> &pairs)
         std::cout << "result\n" << denormalize << " * " << tmp_best_h << " * " << normalize << std::endl;
         prev_count = pairs.size();
     }
-    if (pairs.size() > 7) {
-        //printf("initial %g, ", evaluate_homography(result, pairs));
+    if (pairs.size() > (M*N - 1) / (N-1)) {
+        printf("initial %g, ", evaluate_homography(result, pairs));
         refit_homography(result, pairs);
-        //printf("final %g\n", evaluate_homography(result, pairs));
+        printf("final %g\n", evaluate_homography(result, pairs));
     }
     return result;
 }
@@ -163,7 +171,7 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
 {
     if (false) {
         vector<Measurement> subpairs = random_sample<8>(pairs);//(pairs.begin(), pairs.begin() + 7);
-        fn = homography(subpairs);
+        fn = homography<3, 5>(subpairs);
         out_support = support(fn, pairs, precision).size();
         printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
         return;
@@ -175,10 +183,10 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
     for (int i=0; i < iterations; i++) {
         vector<Measurement> sample = random_sample<min_sample>(pairs);
         size_t prev_sample_size;
-        Matrix35 h = homography(sample);
+        Matrix35 h = homography<3, 5>(sample);
         do {
             prev_sample_size = sample.size();
-            h = homography(sample);
+            h = homography<3, 5>(sample);
             sample = support(h, pairs, precision);
         } while (sample.size() > prev_sample_size);
         if (sample.size() > out_support) {
