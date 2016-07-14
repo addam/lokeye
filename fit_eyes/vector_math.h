@@ -77,6 +77,20 @@ cv::Vec<float, N> sqrt(cv::Vec<float, N> v)
 }
 
 template<int N>
+unsigned max_component (cv::Vec<float, N> v)
+{
+    unsigned result = 0;
+    float max_value = 0;
+    for (unsigned i=0; i<N; ++i) {
+        if (std::abs(v[i]) > max_value) {
+            max_value = std::abs(v[i]);
+            result = i;
+        }
+    }
+    return result;
+}
+
+template<int N>
 Matrix translation(cv::Vec<float, N> v, bool inverse=false)
 {
     Matrix result = Matrix::eye(N + 1, N + 1);

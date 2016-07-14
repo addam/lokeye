@@ -74,19 +74,16 @@ cv::Matx<float, N, M> homography(const vector<std::pair<cv::Vec<float, M-1>, cv:
     }
     cv::Vec<float, M-1> stddev_left = sqrt(variance_left);
     cv::Vec<float, N-1> stddev_right = sqrt(variance_right);
-    vector<cv::Matx<float, N, N>> constraints;
-    for (int i=1; i<N; ++i) {
-        for (int j=0; j<i; ++j) {
-            constraints.push_back(cross_axes<N>(i, j));
-        }
-    }
     Matrix system(0, N*M);
     for (auto pair : pairs) {
         auto lhs = homogenize((pair.first - center_left) / stddev_left);
         auto rhs = homogenize((pair.second - center_right) / stddev_right);
-        for (auto swap : constraints) {
-            auto row = Matrix(swap * rhs * lhs.t());
-            system.push_back(row.reshape(1, 1));
+        int i = max_component(rhs);
+        for (int j=0; j<N; ++j) {
+            if (i != j) {
+                Matrix row(cross_axes<N>(i, j) * rhs * lhs.t());
+                system.push_back(row.reshape(1, 1));
+            }
         }
     }
     Matrix vt = cv::SVD(system, cv::SVD::FULL_UV).vt;
@@ -123,9 +120,9 @@ cv::Matx<float, N, M> homography(const vector<std::pair<cv::Vec<float, M-1>, cv:
         prev_count = pairs.size();
     }
     if (pairs.size() > (M*N - 1) / (N-1)) {
-        printf("initial %g, ", evaluate_homography(result, pairs));
+        //printf("initial %g, ", evaluate_homography(result, pairs));
         refit_homography(result, pairs);
-        printf("final %g\n", evaluate_homography(result, pairs));
+        //printf("final %g\n", evaluate_homography(result, pairs));
     }
     return result;
 }
