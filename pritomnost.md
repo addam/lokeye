@@ -22,10 +22,13 @@ Vyžaduje to krom oblasti obličeje a očí vyznačit na začátku ještě oblas
 ## Hledat cíleně vnitřní koutky očí
 Porovnávání pohybu očí oproti celému obličeji je nesmírně nepřesné, když se uživatel začne divně tvářit. Z vlastního pozorování před zrcadlem vyplývá, že vnitřní koutky očí jsou docela pevně fixované na lebku (do textu diplomky opatřím podklady z učebnice anatomie). Aby výpočet zvládal prudké pohyby hlavy, hodí se ale celý obličej stejnak najít, jako první krok.
 
-Potud hotovo.
-
 ## Afinní transformace obličeje
 Shodnost funguje dobře, dokud se obličej hýbe jen v rovině kolmé na kameru. Otáčení hlavou má už citelné perspektivní zkreslení. Ze zkušeností s trackováním v Blenderu mám obavu, že perspektivita by se příliš pečlivě chytala na nepodstatné změny jako osvětlení a šířka úsměvu. Afinita má navíc skoro stejné vzorečky jako shodnost, takže bude radost ji optimalizovat.
+
+Potud hotovo.
+
+## Adaptive Shape Model
+Trackování několika obdélníků v obrázku působí jako dost nahodilá volba. Větší smysl dává, položit přes obrázek mřížku bodů a trackovat tu. Narozdíl od obyčejných ASM chci pracovat s obdélníkovými buňkami a uvnitř každé počítat skutečné perspektivní zobrazení; věřím, že díky příspěvku sousedních buněk to bude stabilní. Vyžaduje to napočítat derivace homografie při posouvání jednoho ze čtyř kotevních bodů, což je pro mě zajímavá oblast pro průzkum.
 
 ## Normalizace vůči světlosti a kontrastu
 Jednak změny osvětlení a druhak automatické změny závěrky na webkameře můžou hledání obličeje docela zbourat. Normalizace světlosti uvnitř obličeje by měla tyhle problémy vyřešit. Asi nemá smysl tu normalizační funkci derivovat, to by bylo děsně složité; světlost obličeje změním před výpočtem jakoby mimochodem. Aby při posuvu obličeje nemohly výsledky moc skákat, posadím doprostřed obličeje gaussovský kernel a budu jím pixely vážit.
@@ -35,8 +38,6 @@ Program hledá obrys duhovky (angl. limbus) jako kružnici s tmavým vnitřkem. 
 
 ## Deterministická kalibrace
 Aby šlo výpočet předvádět opakovaně s jednou natočeným videem, musí být možné napevno zvoli sekvenci fixací, jaká se ukazuje během kalibrace. Problém je se synchronizací; proto by možná bylo nejlepší údaje o kalibrační sekvenci i s čísly snímku někam uložit. Týž program může uložit i video z kamery, v OpenCV to není problém.
-
-##takový program už by měl bohatě stačit.
 
 ## Ukládání a načítání obličeje
 Kalibrace trvá dlouho. Pro pohodlí by hodně prospělo si její výsledky uložit na disk a při následujícím spuštění programu je zkusit použít. Asi budou potřeba nějaké další heuristiky, protože se osvětlení může měnit dost nepředvidatelným způsobem.
