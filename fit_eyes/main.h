@@ -10,6 +10,7 @@
 #include "vector_math.h"
 
 using std::vector;
+using std::array;
 using Pixel = cv::Point;
 using cv::VideoCapture;
 using cv::Rect;
@@ -46,4 +47,12 @@ inline float pow2(float x)
     return x*x;
 }
 
+template<typename T, typename U = T>
+T exchange(T& obj, U&& new_value)
+{
+    // C++14 example implementation from cppreference.com
+    T old_value = std::move(obj);
+    obj = std::forward<U>(new_value);
+    return old_value;
+}
 #endif // MAIN_H
