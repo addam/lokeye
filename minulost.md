@@ -154,7 +154,7 @@ Doplnil jsem hledání celého obličeje o dohledání malé oblasti u kořene a
 
 Dopsal jsem afinní transformaci. Funguje a kód je dokonce o chlup hezčí.
 
-Několik dnů jsem strávil zkoumáním, co se stane matici 2D -> 2D homografie, když jedním ze čtyř bodů pohnu. Ty objevy mě dost překvapily. Jednak, pro homografii čtyř bodů stačí vyřešit jednu lineární soustavu 3x3 -- a ne 8x8, jak by to udělalo DLT. Ten fígl je, převést body do vhodné kanonické konfigurace a zpátky. Druhak, výsledek je lineární vzhledem k oběma souřadnicím všech čtyř bodů (homogenní matice 3x3, až na škálu, ale to nevadí). Ještě se pokusím výsledné vzorečky trochu zjednodušit. Na Internetu ani v _Multiple View Geometry_ jsem o tomhle nenašel zmínku.
+Několik dnů jsem strávil zkoumáním, co se stane matici 2D -> 2D homografie, když jedním ze čtyř bodů pohnu. Ty objevy mě dost překvapily. Jednak, pro homografii čtyř bodů stačí vyřešit jednu lineární soustavu 3x3 -- a ne 8x8, jak by to udělalo DLT. Ten fígl je, převést body do vhodné kanonické konfigurace a zpátky. Druhak, výsledek je lineární vzhledem k oběma souřadnicím jednoho zvoleného bodu (homogenní matice 3x3, až na škálu, pochopitelně). Zobecnění na zbylé tři body se dá zařídit maticí, která je zpermutuje. Na Internetu ani v _Multiple View Geometry_ jsem o tomhle nenašel zmínku.
 
 ## Srpen 2016
 
