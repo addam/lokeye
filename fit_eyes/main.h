@@ -55,4 +55,9 @@ T exchange(T& obj, U&& new_value)
     obj = std::forward<U>(new_value);
     return old_value;
 }
+
+inline array<Vector2, 4> extract_points(Region region)
+{
+	return {region.tl(), {region.br().x, region.tl().y}, region.br(), {region.tl().x, region.br().y}};
+}
 #endif // MAIN_H

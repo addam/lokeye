@@ -1,5 +1,6 @@
 #include "main.h"
 #include "optimization.h"
+#include "homography.h"
 #include "transformation_perspective.h"
 
 using Params = Transformation::Params;
@@ -12,7 +13,7 @@ Matrix33 canonize(PointPack points)
     Matrix33 result;
     for (int i=0; i<3; ++i) {
         Vector3 row = homogenize(points[(i+1) % 3]).cross(homogenize(points[(i+2) % 3]));
-        result.row(i) = row * (1. / row.dot(homogenize(points[3])));
+        result.row(i) = rowmatrix(row * (1. / row.dot(homogenize(points[3]))));
     }
     return result;
 }
@@ -44,6 +45,12 @@ Vector2 extract_point(Params p, unsigned index)
     //}
     //return result;
 //}
+
+vector<std::pair<Vector2, Vector2>> zip_measurements(const PointPack &left, const PointPack &right)
+{
+	vector<std::pair<Vector2, Vector2>> result;
+	return result;
+}
 
 Params pack_vectors(const PointPack &s)
 {
@@ -80,14 +87,15 @@ decltype(Transformation::canonize_matrix) canonize_all_permutations(PointPack &p
 }
 
 Transformation::Transformation():
-    static_params(0, 0, 1, 1),
+    static_params{Vector2{0, 0}, Vector2{0, 1}, Vector2{1, 1}, Vector2{1, 0}}
 {
+    points = static_params;
     update_params(Matrix33::eye());
 }
 
 Transformation::Transformation(Region region):
-    static_params(region),
-    points(extract_points(region));
+    static_params(extract_points(region)),
+    points(static_params)
 {
     update_params(Matrix33::eye());
 }
@@ -96,25 +104,31 @@ void Transformation::update_params(decltype(params) in_params)
 {
     params = in_params;
     for (int i=0; i<4; ++i) {
+		PointPack points_replaced_dx = points, points_replaced_dy = points;
+		points_replaced_dx.back() = Vector2{1, 0};
+		points_replaced_dy.back() = Vector2{0, 1};
         derivative_matrix[0][i] = decanonize(points_replaced_dx);
         derivative_matrix[1][i] = decanonize(points_replaced_dy);
-        weight_vector[i] = decanonize(points).row(3);
+        weight_vector[i] = vectorize(decanonize(points).row(3));
         cycle(points);
     }
 }
 
 Transformation::Transformation(decltype(params) in_params, decltype(static_params) static_params):
-    static_params(static_params),
+    static_params(static_params)
 {
-    update_params(homography<3, 3>(zip_measurements(static_params, in_params)));
+    for (int i=0; i<4; ++i) {
+        points[i] = project(static_params[i], in_params);
+    }
+    update_params(in_params);
 }
 
 Transformation& Transformation::operator = (const Transformation &other)
 {
-    update_params(other.params);
     for (int i=0; i<4; ++i) {
-        points[i] = project(static_params[i], params);
+        points[i] = project(static_params[i], other.params);
     }
+    update_params(other.params);
     return *this;
 }
 
@@ -130,7 +144,7 @@ Transformation& Transformation::operator += (Params delta)
     for (int i=0; i<points.size(); ++i) {
         points[i] += extract_point(delta, i);
     }
-    update_params(homography(zip_measurements(static_params, points)));
+    update_params(homography<3, 3>(zip_measurements(static_params, points)));
     return *this;
 }
 

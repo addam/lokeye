@@ -20,6 +20,32 @@ using Matrix = cv::Mat_<float>;
 using ColorMatrix = cv::Mat_<Color>;
 
 template<int N>
+cv::Matx<float, N, 1> colmatrix(cv::Vec<float, N> v)
+{
+	return static_cast<cv::Matx<float, N, 1>>(v);
+}
+
+template<int N>
+cv::Matx<float, 1, N> rowmatrix(cv::Vec<float, N> v)
+{
+	return static_cast<cv::Matx<float, N, 1>>(v).t();
+}
+
+template<int N>
+cv::Vec<float, N> vectorize(cv::Matx<float, N, 1> m)
+{
+	cv::Vec<float, N> result;
+	result += m;
+	return result;
+}
+
+template<int N>
+cv::Vec<float, N> vectorize(cv::Matx<float, 1, N> m)
+{
+	return vectorize(m.t());
+}
+
+template<int N>
 cv::Vec<float, N+1> homogenize (cv::Vec<float, N> v)
 {
     cv::Vec<float, N+1> result;
