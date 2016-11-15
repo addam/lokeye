@@ -1,3 +1,4 @@
+#define WITH_OPENMP
 #include <iostream>
 #include "main.h"
 #include "bitmap.h"

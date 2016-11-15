@@ -31,7 +31,7 @@ void refit_homography(cv::Matx<float, N, M> &h, const vector<std::pair<cv::Vec<f
 {
     using Homography = cv::Matx<float, N, M>;
     for (int iteration=0; iteration<10; iteration++) {
-        Homography gradient = Matrix35::zeros();
+        Homography gradient = Homography::zeros();
         for (auto pair : pairs) {
             cv::Vec<float, N-1> projection = project(pair.first, h);
             cv::Vec<float, N-1> diff = projection - pair.second;

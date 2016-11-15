@@ -1,6 +1,9 @@
 #ifndef OPTIMIZATION_H
 #define OPTIMIZATION_H
-#include TSF_HEADER
+#define STRINGIFY2(x) #x
+#define STRINGIFY(x) STRINGIFY2(x)
+#include STRINGIFY(TSF_HEADER)
+#include "bitmap.h"
 
 using Measurement = std::pair<Vector4, Vector2>;
 

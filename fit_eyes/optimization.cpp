@@ -223,8 +223,9 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
 Vector4 Face::operator () () const
 {
     const Vector2 e = eyes[0].pos + eyes[1].pos;
+    const Vector2 c = (main_region.tl() + main_region.br()) / 2;
     /// @note here, we are assuming that Transformation is linear
-    Vector2 difference = main_tsf.inverse(nose_tsf) - main_tsf.inverse(eye_tsf);
+    Vector2 difference = main_tsf.inverse(nose_tsf(c)) - main_tsf.inverse(eye_tsf(c));
     return Vector4(e[0], e[1], difference[0], difference[1]);
 }
 

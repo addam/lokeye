@@ -5,7 +5,7 @@ LDFLAGS = $(LIBS) -L/usr/local/lib
 TRANSFORMATION = affine
 OBJ_TRANSFORMATION = transformation_$(TRANSFORMATION).o
 OBJ_OPTIMIZATION = optimization.o
-CXXFLAGS += -DTSF_HEADER='"transformation_'$(TRANSFORMATION)'.h"'
+CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h
 
 LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
 # -lceres -lglog
