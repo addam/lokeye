@@ -77,6 +77,9 @@ template<typename T>
 Bitmap<T> Bitmap<T>::crop(Region region) const
 {
     Rect rect = to_rect(to_local(region)) & Rect(Pixel(0, 0), DataType::size());
+    if (not rect.area()) {
+        return *this;
+    }
     Bitmap<T> result(static_cast<const DataType&>(*this)(rect));
     result.offset = to_world(rect.tl());
     result.scale = scale;
