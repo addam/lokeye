@@ -3,6 +3,7 @@
 #include "optimization.h"
 #include <vector>
 #include <iostream>
+#include <random>
 const char winname[] = "fit eyes";
 
 namespace {

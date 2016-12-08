@@ -3,6 +3,7 @@
 #include "optimization.h"
 #include "homography.h"
 #include <iostream>
+#include <random>
 
 template<int size>
 vector<Measurement> random_sample(const vector<Measurement> &pairs)
