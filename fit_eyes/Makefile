@@ -1,6 +1,6 @@
 CXX = g++
 OPTIMIZE = -O2 -ffast-math -march=native
-CXXFLAGS = $(OPTIMIZE) -std=c++11 -fopenmp
+CXXFLAGS = $(OPTIMIZE) -std=c++11 -fopenmp -Werror=return-type
 LDFLAGS = $(LIBS) -L/usr/local/lib
 TRANSFORMATION = affine
 OBJ_TRANSFORMATION = transformation_$(TRANSFORMATION).o
