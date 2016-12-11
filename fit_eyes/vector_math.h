@@ -31,6 +31,22 @@ cv::Matx<float, 1, N> rowmatrix(cv::Vec<float, N> v)
 	return static_cast<cv::Matx<float, N, 1>>(v).t();
 }
 
+template<int N, int M, typename Vector=cv::Matx<float, 1, M>>
+void set_row(cv::Matx<float, N, M> &matrix, int i, const Vector &vec)
+{
+	for (int j=0; j<M; ++j) {
+		matrix(i, j) = vec(j);
+	}
+}
+
+template<int N, int M, typename Vector=cv::Matx<float, N, 1>>
+void set_col(cv::Matx<float, N, M> &matrix, int j, const Vector &vec)
+{
+	for (int i=0; i<N; ++i) {
+		matrix(i, j) = vec(i);
+	}
+}
+
 template<int N>
 cv::Vec<float, N> vectorize(cv::Matx<float, N, 1> m)
 {

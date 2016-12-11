@@ -11,7 +11,7 @@ using Rng = std::uniform_real_distribution<>;
 template<int N, int M>
 void param_set(cv::Matx<float, N, M> &params, int i, float value)
 {
-    params(i/Params::cols, i%Params::cols) = value;
+    params(i/M, i%M) = value;
 }
 
 template<int N>
@@ -75,7 +75,7 @@ Gradient numeric(const Transformation &tsf, Vector2 point, float delta)
     for (int j=0; j<param_cn; ++j) {
         Params elem;
         for (int t=0; t<param_cn; ++t) {
-            param_set(elem, j, (j == t) ? delta : 0);
+            param_set(elem, t, (j == t) ? delta : 0);
         }
         Vector2 col = (tsf + elem)(point) - tsf_point;
         for (int i=0; i<2; ++i) {
@@ -104,7 +104,7 @@ int main(int argc, char** argv)
     #endif
     cout << "Analytic:" << endl << analytic(tsf, point) << endl;
     float delta = 1;
-    for (int i=0; i<6; ++i) {
+    for (int i=0; i<2; ++i) {
         cout << "Numeric, delta " << delta << ":" << endl << numeric(tsf, point, delta) << endl;
         delta /= 10;
     }

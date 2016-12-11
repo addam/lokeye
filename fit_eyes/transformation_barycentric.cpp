@@ -1,7 +1,5 @@
 #include "main.h"
 #include "transformation_barycentric.h"
-// TEMPORARY DEBUG
-#include <iostream>
 
 using Params = Transformation::Params;
 
