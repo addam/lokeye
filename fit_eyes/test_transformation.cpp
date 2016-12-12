@@ -34,8 +34,7 @@ float param_get(const  cv::Vec<float, N> &params, int i)
 
 std::basic_ostream<char> &operator<<(std::basic_ostream<char> &stream, const std::array<cv::Vec<float, 2>, 4> arr)
 {
-    using std::endl;
-    return (stream << arr[0] << endl << arr[1] << endl << arr[2] << endl << arr[3]);
+    return (stream << "a = " << arr[0] << "'\nb = " << arr[1] << "'\nc = " << arr[2] << "'\nd = " << arr[3] << "'");
 }
     
 
@@ -51,8 +50,8 @@ Params rand_params(std::minstd_rand &gen)
 cv::Point2f rand_point(std::minstd_rand &gen)
 {
     Vector2 result;
-    result[0] = Rng(0, 640)(gen);
-    result[1] = Rng(0, 480)(gen);
+    result[0] = Rng(0, 500)(gen);
+    result[1] = Rng(0, 500)(gen);
     return result;
 }
 
@@ -61,6 +60,7 @@ Gradient analytic(const Transformation &tsf, Vector2 point)
     Gradient result;
     for (int i=0; i<2; ++i) {
         const Params row = tsf.d(point, i);
+        std::cout << "derivative of " << i << ":\n" << row << std::endl;
         for (int j=0; j<param_cn; ++j) {
             result(i, j) = param_get(row, j);
         }
@@ -92,6 +92,8 @@ int main(int argc, char** argv)
     std::random_device rd;
     std::minstd_rand gen(rd());
     Region region(rand_point(gen), rand_point(gen));
+    region.x *= 10;
+    region.width *= 10;
     cout << region << endl;
     Transformation tsf(region);
     Vector2 point = rand_point(gen);

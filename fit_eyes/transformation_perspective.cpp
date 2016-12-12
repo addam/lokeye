@@ -1,18 +1,7 @@
 #include "main.h"
 #include "optimization.h"
 #include "homography.h"
-#include "transformation_perspective.h"
-// TEMPORARY DEBUG
-#include <iostream>
-namespace {
-	std::basic_ostream<char> &operator<<(std::basic_ostream<char> &stream, const std::array<cv::Vec<float, 2>, 4> arr)
-{
-    using std::endl;
-    return (stream << arr[0] << endl << arr[1] << endl << arr[2] << endl << arr[3]);
-}
-}
-    
-
+#include "transformation_perspective.h"    
 
 using Params = Transformation::Params;
 using PointPack = Transformation::PointPack;
@@ -29,13 +18,19 @@ Matrix33 canonize(PointPack points)
     return result;
 }
 
-Matrix33 decanonize(PointPack points)
+Matrix33 decanonize(PointPack points, int derivative=3)
 {
     Matrix33 system;
     for (int i=0; i<3; ++i) {
         set_col(system, i, homogenize(points[i]));
     }
-    Vector3 alpha = system.solve(homogenize(points[3]), cv::DECOMP_LU);
+    Vector3 last_point = homogenize(points.back());
+    if (derivative < 3) {
+		for (int i=0; i<3; ++i) {
+			last_point(i) = (i == derivative);
+		}
+	}
+    Vector3 alpha = system.solve(last_point, cv::DECOMP_LU);
     for (int i=0; i<3; ++i) {
         set_col(system, i, alpha(i) * homogenize(points[i]));
     }
@@ -48,15 +43,6 @@ Vector2 extract_point(Params p, unsigned index)
     return Vector2(p[2*index + 0], p[2*index + 1]);
 }
 
-//vector<Measurement> extract_measurements(Params p, const decltype(Transformation::static_params) &s)
-//{
-    //vector<Measurement> result;
-    //for (int i=0; i<4; ++i) {
-        //result.emplace_back(std::make_pair(extract_point(p, i), s[i]));
-    //}
-    //return result;
-//}
-
 vector<std::pair<Vector2, Vector2>> zip_measurements(const PointPack &left, const PointPack &right)
 {
 	vector<std::pair<Vector2, Vector2>> result;
@@ -66,12 +52,13 @@ vector<std::pair<Vector2, Vector2>> zip_measurements(const PointPack &left, cons
 	return result;
 }
 
-Params pack_vectors(const PointPack &s)
+Params pack_vectors(const array<array<Vector2, 2>, 4> &vec, int direction)
 {
     Params result;
     for (int i=0; i<4; ++i) {
-        result[2*i + 0] = s[i][0];
-        result[2*i + 1] = s[i][1];
+		for (int j=0; j<2; ++j) {
+	        result[2*i + j] = vec[i][j][direction];
+		}
     }
     return result;
 }
@@ -92,8 +79,8 @@ decltype(Transformation::canonize_matrix) canonize_all_permutations(PointPack po
 {
     array<Matrix33, 4> result{};
     for (int i=0; i<4; ++i) {
-        result[i] = canonize(points);
         cycle(points);
+        result[i] = canonize(points);
     }
     return result;
 }
@@ -120,16 +107,11 @@ void Transformation::update_params(decltype(params) in_params)
 {
 	// why don't we update `points` here? They depend on `params`, anyway.
     params = in_params;
-    //std::cout << "Update points:\n" << points << std::endl << "params:\n" << params << std::endl;
     for (int i=0; i<4; ++i) {
-		PointPack points_replaced_dx = points, points_replaced_dy = points;
-		points_replaced_dx.back() = Vector2{1, 0};
-		points_replaced_dy.back() = Vector2{0, 1};
-        derivative_matrix[0][i] = decanonize(points_replaced_dx);
-        derivative_matrix[1][i] = decanonize(points_replaced_dy);
-        weight_vector[i] = vectorize(decanonize(points).row(2));
-        //std::cout << "Update " << i << " points_replaced:\n" << points_replaced_dx << std::endl << points_replaced_dy << std::endl << derivative_matrix[0][i] << std::endl << derivative_matrix[1][i] << std::endl << "weight " << weight_vector[i] << std::endl;
         cycle(points);
+        derivative_matrix[i][0] = decanonize(points, 0);
+        derivative_matrix[i][1] = decanonize(points, 1);
+        weight_vector[i] = vectorize(decanonize(points).row(2));
     }
 }
 
@@ -175,14 +157,18 @@ Vector2 Transformation::operator () (Vector2 v) const
 
 Params Transformation::d(Vector2 v, int direction) const
 {
-    array<Vector2, 4> result_vectors;
-    Vector2 projected_v = project(v, params);
-    for (int i=0; i<4; ++i) {
-        Vector3 canonized_v = canonize_matrix[i] * homogenize(v);
-        result_vectors[i] = projection_derivative(projected_v, weight_vector[i].dot(canonized_v)) * derivative_matrix[direction][i] * canonized_v;
-        std::cout << "point " << i << ":  ------------\n" << projection_derivative(projected_v, weight_vector[i].dot(canonized_v)) << " *\n" << derivative_matrix[direction][i] << " *\n" << canonize_matrix[i] << " * " << homogenize(v) << std::endl;
-    }
-    return pack_vectors(result_vectors);
+	static Vector2 stored_v(HUGE_VALF, HUGE_VALF);
+    static array<array<Vector2, 2>, 4> result_vectors;
+	if (not (exchange(stored_v, v) == v)) {
+	    Vector2 projected_v = project(v, params);
+	    for (int i=0; i<4; ++i) {
+	        Vector3 canonized_v = canonize_matrix[i] * homogenize(v);
+	        for (int j=0; j<2; ++j) {
+		        result_vectors[i][j] = projection_derivative(projected_v, weight_vector[i].dot(canonized_v)) * derivative_matrix[i][j] * canonized_v;
+			}
+	    }
+	}
+    return pack_vectors(result_vectors, direction);
 }
 
 Region Transformation::operator () (Region region) const

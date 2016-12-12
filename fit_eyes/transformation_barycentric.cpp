@@ -52,6 +52,7 @@ Transformation::Transformation(decltype(params) params, decltype(static_params) 
 Transformation& Transformation::operator = (const Transformation &other)
 {
 	points = dehomogenize(homogenize(other.points) * other.static_params * static_params.inv());
+	return *this;
 }
 
 void Transformation::update_params()
