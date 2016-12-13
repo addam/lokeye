@@ -108,7 +108,7 @@ Nápady:
  * program, co bude malovat terčík a trasu uživatelova pohledu
  * přepsat výpočet, aby běžel v pyramidě
  * celkově úspornější výpočet
- 
+
 ### Etapa od 28. dubna
 
 Výpočet funguje, ale nedává vůbec dobré výsledky a není jasné proč.
@@ -159,3 +159,8 @@ Několik dnů jsem strávil zkoumáním, co se stane matici 2D -> 2D homografie,
 ## Srpen 2016
 
 Docela náhodou jsem objevil program eViacam, kterýžto ovládá myš podle pohybu hlavy. Funguje spolehlivě a hezky i bez nastavování. Zdrojový kód prozrazuje, že celý výpočet je pár funkcí z OpenCV: najít v obrázku hlavu, na ní najít pár významných bodů, ty trackovat KLT algoritmem a zprůměrovat jejich směr. Otáčení a posouvání hlavy má tedy stejný vliv, mně se to nehodí. Je to ale hezká utilita.
+
+## Prosinec 2016
+
+Napsal jsem barycentrickou a perspektivní transformaci jako dvě další alternativy.
+Zkoušení programu naživo mě přesvědčilo, že výpočet selhává hlavně na hledání duhovky / zorničky: to často uletí úplně mimo oko a jen pomalu se vrací.
