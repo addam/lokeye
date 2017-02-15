@@ -1,9 +1,9 @@
 #ifndef MAIN_H
 #define MAIN_H
 #define WITH_OPENMP
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <array>
 #include <vector>
 #include <chrono>

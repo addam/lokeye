@@ -1,6 +1,6 @@
 #ifndef VECTOR_MATH_H
 #define VECTOR_MATH_H
-#include <opencv2/core/core.hpp>
+#include <opencv2/core.hpp>
 
 using Vector2 = cv::Vec2f;
 using Vector3 = cv::Vec3f;
