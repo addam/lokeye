@@ -8,6 +8,7 @@ using Vector4 = cv::Vec<float, 4>;
 using Vector5 = cv::Vec<float, 5>;
 using Vector6 = cv::Vec<float, 6>;
 using Vector8 = cv::Vec<float, 8>;
+using Matrix21 = cv::Matx<float, 2, 1>;
 using Matrix22 = cv::Matx22f;
 using Matrix23 = cv::Matx23f;
 using Matrix32 = cv::Matx32f;

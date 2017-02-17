@@ -20,13 +20,20 @@ inline Matrix33 homogenize(const Matrix23 &mat)
 	return result;
 }
 
+inline Matrix23 hmerge(const Matrix22 &l, const Matrix21 &r)
+{
+	Matrix23 result;
+	for (int i=0; i<2; ++i) {
+		for (int j=0; j<2; ++j) {
+			result(i, j) = l(i, j);
+		}
+		result(i, 2) = r(i, 0);
+	}
+	return result;
+}
+
 inline Matrix23 dehomogenize(const Matrix33 &mat)
 {
-	for (int j=0; j<3; ++j) {
-		if (std::abs(mat(2, j) - 1) > 1e-6) {
-			fprintf(stderr, "dehomogenize error @%i: %g\n", j, mat(2, j));
-		}
-	}
 	return mat.get_minor<2, 3>(0, 0);
 	// TODO: assert something is unity?
 }
@@ -117,6 +124,6 @@ Vector2 Transformation::operator - (const Transformation &other) const
 
 Transformation Transformation::inverse() const
 {
-	return Transformation(dehomogenize(static_params.inv()), homogenize(params).inv());
+	Matrix22 invmat = params.get_minor<2, 2>(0, 0).inv();
+	return Transformation(hmerge(invmat, -invmat * params.get_minor<2, 1>(0, 2)), homogenize(points).inv());
 }
-

@@ -45,7 +45,6 @@ void onmouse3(int event, int x, int y, int, void* param)
 				selected = i;
 			}
 		}
-		printf("select %i\n", selected);
 	} else if (selected >= 0 and event == cv::EVENT_MOUSEMOVE) {
 	    Matrix23 delta = Matrix23::zeros();
 	    delta.col(selected) = Vector2(x, y) - tsf->points.col(selected);
@@ -54,8 +53,9 @@ void onmouse3(int event, int x, int y, int, void* param)
 		}
 	    *tsf += delta;
 	} else if (event == cv::EVENT_LBUTTONUP) {
-		printf("release\n");
 		selected = -1;
+	} else {
+		return;
 	}
 	Transformation tsf_inv = tsf->inverse();
 	for (Pixel p : view) {
@@ -68,24 +68,20 @@ void onmouse3(int event, int x, int y, int, void* param)
 void onmouse2(int event, int x, int y, int, void* param)
 {
     if (event == cv::EVENT_MOUSEMOVE) {
-		printf("move %i %i\n", x, y);
 	    region = Region(Pixel(region.x, region.y), Pixel(x, y));
 	} else if (event == cv::EVENT_LBUTTONUP) {
 		printf("up. Region: %g, %g ... %g, %g\n", region.x, region.y, region.x + region.width, region.y + region.height);
 		cv::setMouseCallback(winname, onmouse3);
 		tsf.reset(new Transformation(region));
 		approx.reset(new Transformation(region));
-		printf("built.\n");
 	}
 }
 
 void onmouse1(int event, int x, int y, int, void* param)
 {
     if (event == cv::EVENT_LBUTTONDOWN) {
-		printf("begin %i %i\n", x, y);
 	    region = Region(x, y, 1, 1);
 		cv::setMouseCallback(winname, onmouse2);
-		printf("region: %g, %g ... %g, %g\n", region.x, region.y, region.x + region.width, region.y + region.height);
 	}
 }
 
@@ -101,8 +97,9 @@ int main()
 		return 1;
 	}
 	printf("fitting\n");
-	while (char(cv::waitKey(100)) != 27) {
+	while (char(cv::waitKey(10)) != 27) {
 		refit_transformation(*approx, region, view, ref, 3);
 		render();
+		std::cout << "params: " << approx->params << std::endl;
 	}
 }

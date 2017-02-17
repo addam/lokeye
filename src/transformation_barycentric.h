@@ -6,7 +6,7 @@ struct Transformation
     using Params = Matrix23;
     Params points;  /// Transformation from barycentric to view coordinates
     const Matrix33 static_params;  /// Transformation from homogeneous reference to barycentric coordinates
-    Params params;  /// Transformation from homogeneous reference to view coordinates
+    Params params;  /// Transformation from homogeneous reference to view coordinates; params == points * static_params
     Transformation();
     Transformation(Region region);
     Transformation(decltype(params), decltype(static_params));
