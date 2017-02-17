@@ -21,7 +21,12 @@ void render_polygon(Bitmap3 &canvas, const std::array<Vector2, N> vertices, floa
 void render()
 {
 	Bitmap3 canvas = view.clone();
+#if defined TRANSFORMATION_BARYCENTRIC_H
     std::array<Vector2, 3> vertices = {vectorize(tsf->points.col(0)), vectorize(tsf->points.col(1)), vectorize(tsf->points.col(2))};
+#elif defined TRANSFORMATION_AFFINE_H
+    std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
+    std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*tsf)(v); });    
+#endif
     render_polygon(canvas, vertices, 0, 1, 0);
     std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*approx)(v); });
     render_polygon(canvas, vertices, 1, 1, 0);
@@ -33,7 +38,7 @@ float sqr_distance(float x, float y, cv::Matx<float, 2, 1> point)
 	return pow2(x - point(0)) + pow2(y - point(1));
 }
 
-#ifdef TRANSFORMATION_BARYCENTRIC_H
+#if defined TRANSFORMATION_BARYCENTRIC_H
 void onmouse3(int event, int x, int y, int, void* param)
 {
 	static int selected = -1;
@@ -63,6 +68,37 @@ void onmouse3(int event, int x, int y, int, void* param)
 	}
 	render();
 }
+#elif defined TRANSFORMATION_AFFINE_H
+void onmouse3(int event, int x, int y, int, void* param)
+{
+	static bool pressed = false;
+	static Vector2 prev;
+    if (event == cv::EVENT_LBUTTONDOWN) {
+		pressed = true;
+	} else if (pressed and event == cv::EVENT_MOUSEMOVE) {
+	    Vector2 diff = Vector2(x, y) - prev;
+	    Transformation::Params delta;
+	    Vector2 a = tsf->static_params.second * tsf->params.second * (prev - tsf->static_params.first);
+	    float length = cv::norm(a);
+	    if (length > 100) {
+			Matrix22 rot = Matrix22(a[0], -a[1], a[1], a[0]) * (1 / length);
+			Matrix22 shear = rot * Matrix22(1 + diff[0] / length, 0, diff[1] / length, 1) * rot.t();
+			tsf->params.second = shear * tsf->params.second;
+		} else {
+			tsf->params.first += diff;
+		}
+	} else if (event == cv::EVENT_LBUTTONUP) {
+		pressed = false;
+	} else {
+		return;
+	}
+    prev = Vector2(x, y);
+	Transformation tsf_inv = tsf->inverse();
+	for (Pixel p : view) {
+		view(p) = ref(tsf_inv(p));
+	}
+	render();
+}
 #endif
 
 void onmouse2(int event, int x, int y, int, void* param)
@@ -74,6 +110,7 @@ void onmouse2(int event, int x, int y, int, void* param)
 		cv::setMouseCallback(winname, onmouse3);
 		tsf.reset(new Transformation(region));
 		approx.reset(new Transformation(region));
+		render();
 	}
 }
 
@@ -100,6 +137,10 @@ int main()
 	while (char(cv::waitKey(10)) != 27) {
 		refit_transformation(*approx, region, view, ref, 3);
 		render();
+		#if defined TRANSFORMATION_BARYCENTRIC_H
 		std::cout << "params: " << approx->params << std::endl;
+		#elif defined TRANSFORMATION_AFFINE_H
+		std::cout << "params: " << approx->params.first << std::endl << approx -> params.second << std::endl;
+		#endif
 	}
 }
