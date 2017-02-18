@@ -3,6 +3,11 @@
 #include "optimization.h"
 #include <memory>
 #include <iostream>
+
+#if defined TRANSFORMATION_PERSPECTIVE_H
+#include "homography.h"
+#endif
+
 const char winname[] = "image";
 Region region;
 std::unique_ptr<Transformation> tsf, approx;
@@ -23,8 +28,8 @@ void render()
 	Bitmap3 canvas = view.clone();
 #if defined TRANSFORMATION_BARYCENTRIC_H
     std::array<Vector2, 3> vertices = {vectorize(tsf->points.col(0)), vectorize(tsf->points.col(1)), vectorize(tsf->points.col(2))};
-#elif defined TRANSFORMATION_AFFINE_H
-    std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
+#elif defined TRANSFORMATION_AFFINE_H || defined TRANSFORMATION_PERSPECTIVE_H
+    std::array<Vector2, 4> vertices = extract_points(region);
     std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*tsf)(v); });    
 #endif
     render_polygon(canvas, vertices, 0, 1, 0);
@@ -40,7 +45,40 @@ float sqr_distance(float x, float y, cv::Matx<float, 2, 1> point)
 	return pow2(x - point(0)) + pow2(y - point(1));
 }
 
-#if defined TRANSFORMATION_BARYCENTRIC_H
+#if defined TRANSFORMATION_PERSPECTIVE_H
+void onmouse3(int event, int x, int y, int, void* param)
+{
+	static int selected = -1;
+    if (event == cv::EVENT_LBUTTONDOWN) {
+		Transformation::PointPack points = tsf->points;
+	    selected = 0;
+	    for (int i=1; i<points.size(); i++) {
+			if (sqr_distance(x, y, points[i]) < sqr_distance(x, y, points[selected])) {
+				selected = i;
+			}
+		}
+	} else if (selected >= 0 and event == cv::EVENT_MOUSEMOVE) {
+	    tsf->points[selected] = Vector2(x, y);
+	    auto region_points = extract_points(region);
+	    vector<std::pair<Vector2, Vector2>> pairs(tsf->points.size());
+	    for (int i=0; i<pairs.size(); ++i) {
+			pairs[i] = {region_points[i], tsf->points[i]};
+			//std::cout << "point " << i << ": " << region_points[i] << " -> " << tsf->points[i] << std::endl;
+		}
+	    tsf->params = homography<3, 3>(pairs);
+	    //std::cout << "params: " << tsf->params << std::endl;
+	} else if (event == cv::EVENT_LBUTTONUP) {
+		selected = -1;
+	} else {
+		return;
+	}
+	Transformation tsf_inv = tsf->inverse();
+	for (Pixel p : view) {
+		view(p) = ref(tsf_inv(p));
+	}
+	render();
+}
+#elif defined TRANSFORMATION_BARYCENTRIC_H
 void onmouse3(int event, int x, int y, int, void* param)
 {
 	static int selected = -1;
