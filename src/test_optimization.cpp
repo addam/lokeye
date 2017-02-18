@@ -28,9 +28,8 @@ void render()
     std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*tsf)(v); });    
 #endif
     render_polygon(canvas, vertices, 0, 1, 0);
-#if defined TRANSFORMATION_AFFINE_H
-    vertices = {to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
-#endif
+    Transformation tsf_inv = tsf->inverse();
+    std::for_each(vertices.begin(), vertices.end(), [tsf_inv](Vector2 &v) { v = tsf_inv(v); });
     std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*approx)(v); });
     render_polygon(canvas, vertices, 1, 1, 0);
 	cv::imshow(winname, canvas);
