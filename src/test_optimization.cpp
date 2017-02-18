@@ -28,6 +28,9 @@ void render()
     std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*tsf)(v); });    
 #endif
     render_polygon(canvas, vertices, 0, 1, 0);
+#if defined TRANSFORMATION_AFFINE_H
+    vertices = {to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
+#endif
     std::for_each(vertices.begin(), vertices.end(), [](Vector2 &v) { v = (*approx)(v); });
     render_polygon(canvas, vertices, 1, 1, 0);
 	cv::imshow(winname, canvas);
@@ -73,26 +76,26 @@ void onmouse3(int event, int x, int y, int, void* param)
 {
 	static bool pressed = false;
 	static Vector2 prev;
+	Vector2 pos(x, y);
     if (event == cv::EVENT_LBUTTONDOWN) {
 		pressed = true;
 	} else if (pressed and event == cv::EVENT_MOUSEMOVE) {
-	    Vector2 diff = Vector2(x, y) - prev;
-	    Transformation::Params delta;
-	    Vector2 a = tsf->static_params.second * tsf->params.second * (prev - tsf->static_params.first);
-	    float length = cv::norm(a);
-	    if (length > 100) {
-			Matrix22 rot = Matrix22(a[0], -a[1], a[1], a[0]) * (1 / length);
-			Matrix22 shear = rot * Matrix22(1 + diff[0] / length, 0, diff[1] / length, 1) * rot.t();
+	    if (not region.contains(tsf->inverse(pos))) {
+		    Vector2 a = prev - tsf->static_params.first;
+		    float length = cv::norm(a);
+			Matrix22 rot = Matrix22(a[0], a[1], -a[1], a[0]).t() * (1 / length);
+		    Vector2 diff = rot.t() * (pos - prev) * (1 / length);
+			Matrix22 shear = rot * Matrix22(1 + diff[0], 0, diff[1], 1) * rot.t();
 			tsf->params.second = shear * tsf->params.second;
 		} else {
-			tsf->params.first += diff;
+			tsf->params.first += (pos - prev);
 		}
 	} else if (event == cv::EVENT_LBUTTONUP) {
 		pressed = false;
 	} else {
 		return;
 	}
-    prev = Vector2(x, y);
+    prev = pos;
 	Transformation tsf_inv = tsf->inverse();
 	for (Pixel p : view) {
 		view(p) = ref(tsf_inv(p));
@@ -124,8 +127,10 @@ void onmouse1(int event, int x, int y, int, void* param)
 
 int main()
 {
-    cv::VideoCapture cam(0);
-	ref.read(cam);
+    {
+		cv::VideoCapture cam(0);
+		ref.read(cam);
+	}
 	view = ref.clone();
 	cv::namedWindow(winname);
 	cv::setMouseCallback(winname, onmouse1);
