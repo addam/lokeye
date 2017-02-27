@@ -164,3 +164,62 @@ Docela náhodou jsem objevil program eViacam, kterýžto ovládá myš podle poh
 
 Napsal jsem barycentrickou a perspektivní transformaci jako dvě další alternativy.
 Zkoušení programu naživo mě přesvědčilo, že výpočet selhává hlavně na hledání duhovky / zorničky: to často uletí úplně mimo oko a jen pomalu se vrací.
+
+## Únor 2017
+
+Napsal jsem ukázkové programy k odzkoušení transformací na statickém záběru.
+Všechny fungují bezchybně, ale hodně pomalu.
+
+Napsal jsem program pod Windows, který nahraje člověka u počítače a zaznamená jeho směr pohledu z Tobii EyeX, snímek po snímku.
+
+### Etapa od 20. února
+
+Nápady ze schůzky:
+
+ * měl bych odzkoušet neuronové sítě. Tak jako tak budu potřebovat velký dataset očí -> opatřit ho.
+ * Odzkoušet, jaké výsledky vrací výpočet při sledování známého fixního bodu. Možná utíká výpočet, krom toho trochu utíkají oči. Jaké výsledky pak dává Tobii?
+ * Pročíst články o hledání očí obecně a dále eigeneyes, neuronové sítě, Stefanos Zafeiriou. 
+
+Stáhnul jsem datasety:
+
+* Labeled pupils in the wild (2015): http://www.hci.iis.u-tokyo.ac.jp/~cvs/datasets/
+  * sada 66 videí různých lidí s detailní kamerou na oko
+  * každý snímek má označené těžiště panenky (nikoli střed oka)
+  * kamera je fixní vůči obličeji, takže oko nemusím hledat
+  * všechna videa jsou hodně zblízka a z boku, takže to asi nemůžu použít
+* Appearance-based Gaze Estimation in the Wild (Zhang, Sugano, Fritz, Bulling, 2015):
+	 * MPIIGaze dataset
+	 * 15 lidí s laptopem sleduje křížek na monitoru v různém prostředí, během dne
+	 * srovnání různých technik a CNN
+* Synthes Eyes (2015): https://www.cl.cam.ac.uk/research/rainbow/projects/syntheseyes/
+  * uměle renderované oči s náhodnými parametry
+  * natočení hlavy (3dof), natočení oka (2dof)
+  * 11k skvělých obrázků
+* Fotky z instagramu (aktuální k 20. 2. 2017):
+  * &sharp;selfie: https://www.instagram.com/explore/tags/selfie/
+  * downloader: https://www.instadownloader.net/hashtag
+* BioID database: https://www.bioid.com/About/BioID-Face-Database
+  * ručně označené, první dva vektory jsou pravá a levá zornička
+  * některé obrázky jsou se zavřenýma očima, to je absurdní.
+* seznam dalších datasetů: http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm#face
+  * všechny zmíněné tam jsou, ten seznam je asi aktuální
+* další seznam: https://sites.google.com/a/nd.edu/public-cvrl/data-sets
+
+Přečetl jsem články:
+
+* Unsupervised Eye Pupil Localization through Differential Geometry and Local Self-Similarity Matching (Leo, Cazzato, Marco, Distante 2014):
+  * součet kružnicové Hough transformace a kros-korelace při různém otočení (míra rotační symetrie)
+  * oči z obličejů vyřízli nahrubo adaboostem (Matlab CV)
+  * asi to funguje spolehlivě, ale přesnost bude nutně na úrovni pixelů
+* Eye pupil localization with an ensemble of randomized trees (Makus et al 2013):
+  * listy jsou konstantní -> přesnost řádově taková, aby označily vnitřek zorničky -> nestačí.
+* program Pupil (Kassner, Patera, Bulling):
+  * hledání zorničky: elipsa fitovaná na tmavou oblast
+  * přepočet na gaze: polynom
+ 
+Seznam k přečtení:
+
+* Handbook of iris recognition (jen přehledově):
+  * rozbor zkreslení způsobeného čočkou a zraněním
+  * kapitoly 8-10 vypadají zajímavě, stojí za půjčení/stažení
+* Visualizing and Understanding Convolutional Networks (Zeiler, Fergus 2013)
