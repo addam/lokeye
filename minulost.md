@@ -182,44 +182,24 @@ Nápady ze schůzky:
 
 Stáhnul jsem datasety:
 
-* Labeled pupils in the wild (2015): http://www.hci.iis.u-tokyo.ac.jp/~cvs/datasets/
-  * sada 66 videí různých lidí s detailní kamerou na oko
-  * každý snímek má označené těžiště panenky (nikoli střed oka)
-  * kamera je fixní vůči obličeji, takže oko nemusím hledat
-  * všechna videa jsou hodně zblízka a z boku, takže to asi nemůžu použít
-* Appearance-based Gaze Estimation in the Wild (Zhang, Sugano, Fritz, Bulling, 2015):
-	 * MPIIGaze dataset
-	 * 15 lidí s laptopem sleduje křížek na monitoru v různém prostředí, během dne
-	 * srovnání různých technik a CNN
-* Synthes Eyes (2015): https://www.cl.cam.ac.uk/research/rainbow/projects/syntheseyes/
-  * uměle renderované oči s náhodnými parametry
-  * natočení hlavy (3dof), natočení oka (2dof)
-  * 11k skvělých obrázků
-* Fotky z instagramu (aktuální k 20. 2. 2017):
-  * &sharp;selfie: https://www.instagram.com/explore/tags/selfie/
-  * downloader: https://www.instadownloader.net/hashtag
-* BioID database: https://www.bioid.com/About/BioID-Face-Database
-  * ručně označené, první dva vektory jsou pravá a levá zornička
-  * některé obrázky jsou se zavřenýma očima, to je absurdní.
-* seznam dalších datasetů: http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm#face
-  * všechny zmíněné tam jsou, ten seznam je asi aktuální
+* Labeled pupils in the wild (2015): http://www.hci.iis.u-tokyo.ac.jp/~cvs/datasets/ : sada 66 videí různých lidí s detailní kamerou na oko. Každý snímek má označené obrazové těžiště panenky (proto nepřesně). Kamera byla k obličeji napevno přidělaná, většinou hodně zblízka a z boku -- to je dost jiná situace, asi nepůjde použít.
+* Appearance-based Gaze Estimation in the Wild (Zhang, Sugano, Fritz, Bulling, 2015), odtud MPIIGaze dataset: 15 lidí v průběhu měsíce požádala aplikace na laptopu, aby sledovali několik křížků na monitoru. Z webkamery pořízená spousta fotek v dost rozmanitých (a mnohdy mizerných) podmínkách. Článek srovnává různé techniky určování směru pohledu s vlastním přístupem pomocí konvolučních sítí -- ty zjevně fungují skvěle.
+* Synthes Eyes (2015): https://www.cl.cam.ac.uk/research/rainbow/projects/syntheseyes/ : uměle renderované oči s náhodnými parametry. Celkem 12 modelů levého oka a blízkého okolí, každý vyrenderovaný tisíckrát v různém osvětlení, různém natočení kamery a směru pohledu oka (včetně přivírání víčka). Všechny parametry jsou v datasetu uložené, je to dokonale přesné. Některé snímky jsou v úplné tmě, na jiných je z panenky vidět jenom růžek.
+* Fotky z instagramu (aktuální k 20. 2. 2017): https://www.instagram.com/explore/tags/selfie/ : ručně jsem pořídil pomocí downloaderu https://www.instadownloader.net/hashtag a odtud vybral 150 fotek s jednoznačně viditelnýma očima a bez výraznějších filtrů. Každá fotka je jiný člověk, zahrnuje to všechny možné národnosti a světelné podmínky. Pochopitelně, zorničky ani směr pohledu nejsou nijak označené.
+* BioID database: https://www.bioid.com/About/BioID-Face-Database : ručně označené (první dva landmarky jsou pravá a levá zornička) fotky v umělých podmínkách. Černobílé obrázky ~320x240. Některé obrázky jsou se zavřenýma očima, to je absurdní.
+* seznam dalších datasetů: http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm#face (všechny zmíněné tam jsou, ten seznam je asi aktuální)
 * další seznam: https://sites.google.com/a/nd.edu/public-cvrl/data-sets
 
 Přečetl jsem články:
 
-* Unsupervised Eye Pupil Localization through Differential Geometry and Local Self-Similarity Matching (Leo, Cazzato, Marco, Distante 2014):
-  * součet kružnicové Hough transformace a kros-korelace při různém otočení (míra rotační symetrie)
-  * oči z obličejů vyřízli nahrubo adaboostem (Matlab CV)
-  * asi to funguje spolehlivě, ale přesnost bude nutně na úrovni pixelů
-* Eye pupil localization with an ensemble of randomized trees (Makus et al 2013):
-  * listy jsou konstantní -> přesnost řádově taková, aby označily vnitřek zorničky -> nestačí.
-* program Pupil (Kassner, Patera, Bulling):
-  * hledání zorničky: elipsa fitovaná na tmavou oblast
-  * přepočet na gaze: polynom
+* Unsupervised Eye Pupil Localization through Differential Geometry and Local Self-Similarity Matching (Leo, Cazzato, Marco, Distante 2014): součet kružnicové Hough transformace a kros-korelace při různém otočení (míra rotační symetrie). Oči z obličejů vyřízli nahrubo adaboostem (Matlab CV). Asi to funguje spolehlivě, kros-korelace stojí za vyzkoušení. Přesnost je nevyhnutelně na úrovni pixelů a ten přístup je zbytečně globální -- pro stabilitu se navíc kombinuje ze všech úrovní pyramidy.
+* Eye pupil localization with an ensemble of randomized trees (Makus et al 2013): rozhodovací stromy na výřez oka. Listy jsou konstantní, takže přesnost tak akorát stačí k tomu, aby se strefila někam dovnitř zorničky. Tohle rozhodně nestačí, a obecně mi rozhodovací stromy pro tuhle úlohu nepřijdou dobré, protože špatně zacházejí s posuvem v obrázku.
+* program Pupil (Kassner, Patera, Bulling): fungující program určený pro do-it-yourself eye trackery s kamerou namontovanou k hlavě. Zorničku hledá fitováním elipsy na tmavou oblast v obrázku, přepočet na souřadnice v obrázku zařídí nafitovaný polynom.
+* Cross spread pupil tracking technique (Wolski, Mantiuk 2016): minimalistické zaměřování zorničky vrháním paprsku z jejího vnitřku. Ignoruje to zakrytí očními víčky, takže je to pro mě naprosto nevhodné.
  
 Seznam k přečtení:
 
-* Handbook of iris recognition (jen přehledově):
-  * rozbor zkreslení způsobeného čočkou a zraněním
-  * kapitoly 8-10 vypadají zajímavě, stojí za půjčení/stažení
+* Handbook of iris recognition (Springer, 2016): kapitoly 8-10 se přímo zabývají hledáním oka. Mám stažené.
+* Face Recognition in Adverse Conditions (IGI Global, 2014): sborník o hledání obličejů obecně, očím se věnuje sotva jedna kapitola. Celkově to je náramný zdroj referencí na články a datasety. Podařilo se mi stáhnout ze safaribooksonline.com.
 * Visualizing and Understanding Convolutional Networks (Zeiler, Fergus 2013)
+* Realtime 3D Eye Gaze Animation Using a Single RGB Camera (Wang, Shi, Xia, Chai 2016)
