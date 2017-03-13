@@ -106,6 +106,15 @@ bool Bitmap3::read(VideoCapture &cap)
     return true;
 }
 
+template<>
+bool Bitmap3::read(const std::string &filename)
+{
+    cv::Mat tmp = cv::imread(filename, cv::IMREAD_COLOR);
+    tmp.convertTo(static_cast<DataType&>(*this), DataType().type(), 1./255);
+    scale = 1;
+    return true;
+}
+
 template<typename T>
 void init_rect(Rect &region, T img)
 {
