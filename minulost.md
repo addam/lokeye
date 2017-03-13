@@ -196,10 +196,37 @@ Přečetl jsem články:
 * Eye pupil localization with an ensemble of randomized trees (Makus et al 2013): rozhodovací stromy na výřez oka. Listy jsou konstantní, takže přesnost tak akorát stačí k tomu, aby se strefila někam dovnitř zorničky. Tohle rozhodně nestačí, a obecně mi rozhodovací stromy pro tuhle úlohu nepřijdou dobré, protože špatně zacházejí s posuvem v obrázku.
 * program Pupil (Kassner, Patera, Bulling): fungující program určený pro do-it-yourself eye trackery s kamerou namontovanou k hlavě. Zorničku hledá fitováním elipsy na tmavou oblast v obrázku, přepočet na souřadnice v obrázku zařídí nafitovaný polynom.
 * Cross spread pupil tracking technique (Wolski, Mantiuk 2016): minimalistické zaměřování zorničky vrháním paprsku z jejího vnitřku. Ignoruje to zakrytí očními víčky, takže je to pro mě naprosto nevhodné.
- 
+* Realtime 3D Eye Gaze Animation Using a Single RGB Camera (Wang, Shi, Xia, Chai 2016): sledování celé hlavy a mimo jiné očí. 
+Rozpoznává, jak se člověk tváří, a tedy je vůči tomu odolný.
+Sledování očí je motivované, aby to v animaci vypadalo přesvědčivě.
+Citují Tobii jakožto IR přístup, ale není k tomu žádný článek. Zmiň
+Citují určování gaze z obrázku oka a předpočítaného natočení hlavy pomocí CNN: Sugano 2014, Wood 2015, Zhang 2015.
+Model obličeje lineární parametrizací z Face Warehouse (Cao 2014): výraz a osoba jsou explicitní, parametry osoby se zafixují
+Klasifikace pixelů kolem oka: obrázek normalizujeme k podobnostní transformaci a na greyscale patch pošleme rozhodovací les.
+Zorničku tipnou pomocí Mean Shift na (dost chlupaté) pravděpodobnosti z klasifikace, potom si pomůžou Distance transformací (hodně pročištěných) dat z Cannyho detektoru, a nakonec to celé zabalí do MAP optimalizace s ohledem na předchozí snímek.
+Detekce zavřených očí pomocí náhodného lesa.
+Směr pohledu obou očí zároveň musí mít dost blízkého souseda v trénovací databázi, jinak se bere jako chyba.
+
+* Face alignment at 3000 fps via regressing local binary features (Ren, Cao.. 2014)
+Local Binary Pattern: srovnání (1-bit) středu pravidelného n-úhelníka s vrcholy, v každém pixelu
+jak se budují ty stromy -- jsou to LBP, a když, tak z jakých pixelů?
+co je to za hodnoty, které jdou do lineární regrese?
+
 Seznam k přečtení:
 
 * Handbook of iris recognition (Springer, 2016): kapitoly 8-10 se přímo zabývají hledáním oka. Mám stažené.
 * Face Recognition in Adverse Conditions (IGI Global, 2014): sborník o hledání obličejů obecně, očím se věnuje sotva jedna kapitola. Celkově to je náramný zdroj referencí na články a datasety. Podařilo se mi stáhnout ze safaribooksonline.com.
 * Visualizing and Understanding Convolutional Networks (Zeiler, Fergus 2013)
-* Realtime 3D Eye Gaze Animation Using a Single RGB Camera (Wang, Shi, Xia, Chai 2016)
+* Real-time high-fidelity facial performance capture (Cao, Bradley, Zhou, Beller 2015)
+* Megvii: http://www.faceplusplus.com.cn
+
+Myšlenky:
+
+* Mean Shift na hledání zorničky vypadá šikovně. Když se vezme jako jeden blok spolu s klasifikací, vlastně má něco společného s mým iteračním schématem. Podstatné je ohodnotit všechny pixely uvnitř, a nepatlat se s derivacema. Mean shift pro obecný kernel nemá zaručenou konvergenci. Možná stojí za srovnání poctivý přístup s derivacema a pragmatické průměrování.
+
+### Etapa od 7. března
+
+Myšlenky ze schůzky:
+* Nedali autoři MPIIGaze nějaké mezivýsledky ke stažení -- pozice očí, natočení hlavy?
+* do příště natočit pár videí s dobrým osvětlením a vrátit Tobii
+* implementovat +- algoritmus na hledání očí z [Wang, Shi... 2016] a případně si s ním pohrát
