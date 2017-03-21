@@ -224,6 +224,8 @@ Myšlenky:
 
 * Mean Shift na hledání zorničky vypadá šikovně. Když se vezme jako jeden blok spolu s klasifikací, vlastně má něco společného s mým iteračním schématem. Podstatné je ohodnotit všechny pixely uvnitř, a nepatlat se s derivacema. Mean shift pro obecný kernel nemá zaručenou konvergenci. Možná stojí za srovnání poctivý přístup s derivacema a pragmatické průměrování.
 
+## Březen 2017
+
 ### Etapa od 7. března
 
 Myšlenky ze schůzky:
@@ -242,7 +244,7 @@ Zběžně jsem pročetl články:
 * PupilNet: Convolutional Neural Networks for Robust Pupil Detection (Fuhl 2016): jedna síť najde zorničku nahrubo, druhá doladí výsledek na výřezu. To je v určitém kontrastu s tím, že se zřejmě předpokládá záběr oka zblízka.
 * Fast and Accurate Algorithm for Eye Localization for Gaze Tracking in Low Resolution Images (George 2016): obličej hledají Adaboostem. V prvním kroku kros-korelace kružnice s gradientem obrázku určí střed; průměr je ve fixním poměru k velikosti obličeje. V druhém kroku se na profiltrované radiální hrany fituje elipsa ransac schématem. Gaze se pak vypočte oproti koutkům oka jako polynom anebo interpolace mřížky. Berou v úvahu jen otočení hlavy v obrazové rovině, a to přičítají explicitně. Musím dočíst podrobnosti o fitování elipsy.
 
-## Etapa od 21. března
+### Etapa od 21. března
 
 Úkoly ze schůzky:
 * pořídit data s bezvadným osvětlením a případně s ostřící kamerou
