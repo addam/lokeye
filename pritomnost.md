@@ -1,9 +1,15 @@
 # Aktuální plán a TODO list
 
-poslední změna: 13. prosince
+poslední změna: 21. března
+
+## Videa
+Video musí být natočené v silném rovnoměrném osvětlení, zblízka, bez brýlí a bez výrazných hran na pozadí.
+Potřebuju natočit několik různých lidí.
 
 ## Sledování obličeje ve videu na disku
 Místo streamu z kamery musí jít taky otevřít soubor a nechat si ho na ukázku zpracovat.
+
+# Odložené myšlenky
 
 ## Adaptive Shape Model
 Trackování několika obdélníků v obrázku působí jako dost nahodilá volba.
