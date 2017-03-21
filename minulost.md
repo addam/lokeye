@@ -230,3 +230,20 @@ Myšlenky ze schůzky:
 * Nedali autoři MPIIGaze nějaké mezivýsledky ke stažení -- pozice očí, natočení hlavy?
 * do příště natočit pár videí s dobrým osvětlením a vrátit Tobii
 * implementovat +- algoritmus na hledání očí z [Wang, Shi... 2016] a případně si s ním pohrát
+
+Odzkoušel jsem funkce z OpenCV na hledání hran (Canny) a kruhů (HoughCircles). Detekce hran špatně funguje na rozmazaných fotkách -- možná je to tak dobře, a možná to půjde spravit výpočtem v pyramidě. Detekce kruhů je závislá na min/max průměru, většinou oko nenajde.
+Napsal jsem vlastní Hough transformaci, v každém pixelu počítám gradient a křivost (http://www0.cs.ucl.ac.uk/staff/ucacarr/teaching/ndsp/curvature.pdf). S poloměrem kruhu roste šum při výpočtu jeho středu, proto hlasování zaznamenávám do pyramidy. Tím se ale ztrácí přesnost.
+
+Zběžně jsem pročetl články:
+* Deep Learning for Eye Tracking (2016): prezentace firmy 7invensun.com. Eye tracking výhradně s konvolučními sítěmi a s IR přísvitem. Web je čínsky.
+* Convolutional Neural Networks for Eye Detection in Remote Gaze Estimation Systems (Lam 2008): hledání oka v obrázku, působí jako školní cvičení o neuronových sítích. Dataset vyráběli ručně a nafoukli ho otáčením a změnou světlosti.
+* Eye Pupil Location Using Webcam (Ciesla 2012): srovnání tří ledabylých výpočtů na zaměřování dobře viditelné zorničky v obrázku oka.
+* ExCuSe: Robust Pupil Detection in Real-World Scenarios (Fuhl 2015): několik jednoduchých kroků na ošetření různých případů. Na pohled je v tom hodně volných parametrů.
+* PupilNet: Convolutional Neural Networks for Robust Pupil Detection (Fuhl 2016): jedna síť najde zorničku nahrubo, druhá doladí výsledek na výřezu. To je v určitém kontrastu s tím, že se zřejmě předpokládá záběr oka zblízka.
+* Fast and Accurate Algorithm for Eye Localization for Gaze Tracking in Low Resolution Images (George 2016): obličej hledají Adaboostem. V prvním kroku kros-korelace kružnice s gradientem obrázku určí střed; průměr je ve fixním poměru k velikosti obličeje. V druhém kroku se na profiltrované radiální hrany fituje elipsa ransac schématem. Gaze se pak vypočte oproti koutkům oka jako polynom anebo interpolace mřížky. Berou v úvahu jen otočení hlavy v obrazové rovině, a to přičítají explicitně. Musím dočíst podrobnosti o fitování elipsy.
+
+## Etapa od 21. března
+
+Úkoly ze schůzky:
+* pořídit data s bezvadným osvětlením a případně s ostřící kamerou
+* do budoucna, implementovat hledání očí z [George 2016]: NCC nebo FCC hledání kružnice, potom ransac fitování elipsy na dostředné hrany
