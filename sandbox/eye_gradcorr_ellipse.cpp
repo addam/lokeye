@@ -8,7 +8,7 @@ using namespace std;
 int radius = 20;
 const float blurCoef = 0.2;
 int thr = 30;
-Mat image, grad;
+Mat image, gray, grad;
 const char* winname = "gradient cross-correlation with a circle";
 
 float pow2(float x)
@@ -22,6 +22,49 @@ bool local_maximum(const Mat &img, int x, int y)
 		(x == img.cols - 1 or img.at<float>(y, x) >= img.at<float>(y, x + 1)) and
 		(y == 0 or img.at<float>(y, x) > img.at<float>(y - 1, x)) and
 		(y == img.rows - 1 or img.at<float>(y, x) > img.at<float>(y + 1, x));
+}
+
+vector<Point> make_circle(int r)
+{
+	vector<Point> result;
+	for (int x=0; ; ++x) {
+		int y = sqrt(pow2(r) - pow2(x));
+		if (y <= x) {
+			break;
+		} else {
+			result.push_back(Point(x, y));
+		}
+	}
+	result.reserve(8 * result.size() - 4);
+	std::transform(result.begin(), result.end() - (result.back().x == result.back().y), back_inserter(result), [](Point p) { return Point(p.y, p.x); });
+	std::transform(result.begin(), result.end() - 1, back_inserter(result), [](Point p) { return Point(p.x, -p.y); });
+	std::transform(result.begin() + 1, result.end() - 1, back_inserter(result), [](Point p) { return Point(-p.x, p.y); });
+	std::sort(result.begin(), result.end(), [](Point a, Point b) { return a.y < b.y or (a.y == b.y and a.x < b.x); });
+	return result;
+}
+
+float curve_average(const Mat &img, const vector<Point> &curve, Point offset)
+{
+	float result = 0;
+	for (Point p : curve) {
+		p += offset;
+		if (p.x >= 0 and p.y >= 0 and p.x < img.cols and p.y < img.rows) {
+			result = std::max(result, img.at<float>(p));
+		}
+	}
+	return result;
+}
+
+void nonmaxsupp(Mat &img)
+{
+	assert (img.type() == CV_32FC1);
+	vector<Point> curve = make_circle(2 * radius);
+	for (int i=0; i<img.rows; ++i) {
+		for (int j=0; j<img.cols; ++j) {
+			float &val = img.at<float>(i, j);
+			val -= 0.5 * curve_average(img, curve, Point(j, i));
+		}
+	}
 }
 
 vector<Point> maxima(Mat src, unsigned count, Point offset={0, 0})
@@ -50,28 +93,29 @@ vector<Point> maxima(Mat src, unsigned count, Point offset={0, 0})
 	return result;
 }
 
-Mat gradient(Mat img)
+Mat gradient(Mat img, bool use_threshold=false)
 {
 	Mat d[2], result;
 	Sobel(img, d[0], -1, 1, 0, -1);
-	Sobel(img, d[1], -1, 1, 0, -1);
+	Sobel(img, d[1], -1, 0, 1, -1);
 	merge(d, 2, result);
-	float max = 0;
-	for (int i=0; i<img.rows; ++i) {
-		for (int j=0; j<img.cols; ++j) {
-			Vec2f g = result.at<Vec2f>(i, j);
-			if (norm(g) > max) {
-				max = norm(g);
+	if (use_threshold) {
+		float max = 0;
+		for (int i=0; i<img.rows; ++i) {
+			for (int j=0; j<img.cols; ++j) {
+				Vec2f g = result.at<Vec2f>(i, j);
+				if (norm(g) > max) {
+					max = norm(g);
+				}
 			}
 		}
-	}
-	for (int i=0; i<img.rows; ++i) {
-		for (int j=0; j<img.cols; ++j) {
-			Vec2f &g = result.at<Vec2f>(i, j);
-			if (100 * norm(g) > thr * max) {
-				//g /= norm(g);
-			} else {
-				g *= 0;
+		max /= 100;
+		for (int i=0; i<img.rows; ++i) {
+			for (int j=0; j<img.cols; ++j) {
+				Vec2f &g = result.at<Vec2f>(i, j);
+				if (norm(g) > max) {
+					g *= max / norm(g);
+				}
 			}
 		}
 	}
@@ -166,21 +210,24 @@ static void onTrackbar(int, void*)
 	}
 	int blurSize = max(blurCoef * radius, 1.f);
 	Point center(radius + blurSize, radius + blurSize);
-	Mat tmpl = Mat::ones(2 * center.y, 2 * center.x, CV_32FC1), result;
+	Mat ccor, ccor_grad;
+	Mat tmpl = Mat::ones(2 * center.y, 2 * center.x, CV_32FC1);
 	circle(tmpl, center, radius, 0.0, -1);
 	blur(tmpl, tmpl, Size(blurSize, blurSize));
-	//imshow("template", tmpl);
-	tmpl = gradient(tmpl);
-	matchTemplate(grad, tmpl, result, TM_CCORR_NORMED);
-	//imshow("ccor", result);
-	vector<Point> circles = maxima(result, max(10, result.cols / 10), center);
+	grad = gradient(gray, true);
+    matchTemplate(gray, tmpl, ccor, TM_CCORR_NORMED);
+    matchTemplate(grad, gradient(tmpl), ccor_grad, TM_CCORR_NORMED);
+    ccor = (thr * ccor + (100 - thr) * ccor_grad) / 100;
+	//imshow("ccor", ccor);
+	nonmaxsupp(ccor);
+	vector<Point> circles = maxima(ccor, max(10, ccor.cols / 10), center);
 	Mat canvas(image.rows, max(2*image.cols, 200), CV_8UC3);
 	canvas = 0;
-	//printf("img: %ix%i, grad: %ix%i, tmpl': %ix%i, tmpl: %ix%i, ccor: %ix%i, canvas: %ix%i\n", image.rows, image.cols, grad.rows, grad.cols, 2*center.y, 2*center.x, tmpl.rows, tmpl.cols, result.rows, result.cols, canvas.rows, canvas.cols);
+	//printf("img: %ix%i, grad: %ix%i, tmpl': %ix%i, tmpl: %ix%i, ccor: %ix%i, canvas: %ix%i\n", image.rows, image.cols, grad.rows, grad.cols, 2*center.y, 2*center.x, tmpl.rows, tmpl.cols, ccor.rows, ccor.cols, canvas.rows, canvas.cols);
 	image.copyTo(canvas.colRange(0, image.cols));
-	for (int i=0; i<result.rows; ++i) {
-		for (int j=0; j < result.cols; ++j) {
-			float g = result.at<float>(i, j);
+	for (int i=0; i<ccor.rows; ++i) {
+		for (int j=0; j < ccor.cols; ++j) {
+			float g = ccor.at<float>(i, j);
 			canvas.at<Vec3b>(i + center.y, j + center.x + image.cols) = Vec3b(128, 128 + 128 * g, 128 - 128 * g);
 		}
 	}
@@ -195,8 +242,8 @@ static void onTrackbar(int, void*)
 		}
         circle(canvas, circles[i] + Point(image.cols, 0), radius, Scalar(128, 255, 255), 1, 8, 0);
     }
-    printf("score %g: %g, %g, %gx%g, %g\n", best_score, best.center.x, best.center.y, best.size.width, best.size.height, best.angle);
     if (best_score > 0) {
+	    //printf("score %g: %g, %g, %gx%g, %g\n", best_score, best.center.x, best.center.y, best.size.width, best.size.height, best.angle);
 		ellipse(canvas, best, Scalar(128, 255, 0));
 	}
     imshow(winname, canvas);
@@ -214,10 +261,8 @@ int main(int argc, const char** argv)
 	    VideoCapture cam(0);
 		cam.read(image);
 	}
-    Mat gray;
     cvtColor(image, gray, COLOR_BGR2GRAY);
     gray.convertTo(gray, CV_32FC1, 1./255);
-    grad = gradient(gray);
     namedWindow(winname, 1);
     createTrackbar("T", winname, &thr, 100, onTrackbar);
     createTrackbar("R", winname, &radius, min(image.rows, image.cols) / 3, onTrackbar);
