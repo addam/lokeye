@@ -249,3 +249,14 @@ Zběžně jsem pročetl články:
 Úkoly ze schůzky:
 * pořídit data s bezvadným osvětlením a případně s ostřící kamerou
 * do budoucna, implementovat hledání očí z [George 2016]: NCC nebo FCC hledání kružnice, potom ransac fitování elipsy na dostředné hrany
+
+Poznatky o hledání očí / zorniček:
+* Nemá smysl v Hough transformaci používat křivost, je strašně nepřesná.
+* Nemá smysl brát zorničku jako elipsu, je z toho jenom overfitting. Můžu se spolehnout, že kamera zabírá uživatele docela zpříma.
+
+Napsal jsem několik experimentálních programů na hledání duhovky:
+* normalizovaná kroskorelace s černým kruhem: funguje v některých případech pěkně, ale pochopitelně moc nezvládá světle modré duhovky,
+* normalizovaná kroskorelace gradientu kruhu: funguje pěkně, když je fotka ostrá. Jinak je potřeba správně naladit míru rozmazání masky,
+* kroskorelace s normalizovaným gradientem, a polynomem počítaným z výsledků: přijde mi to jako dobrý nápad, ale bohužel přidává několik parametrů, které je potřeba doladit,
+* ohodnocení radiální symetrie a síly gradientu na konci každého poloměru: asi nejpodrobnější model duhovky, co dovedu vymyslet. Má hodně volných parametrů a zatím nefunguje moc dobře.
+
