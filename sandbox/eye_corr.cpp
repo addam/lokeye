@@ -59,16 +59,34 @@ static void onTrackbar(int, void*)
     imshow(winname, canvas);
 }
 
+void quiet_run(float radius, float &x, float &y)
+{
+	const int offset = 1.5 * radius;
+	Mat tmpl = Mat::ones(2 * offset, 2 * offset, CV_32FC1), score;
+	circle(tmpl, Point(offset, offset), radius, 0.0, -1);
+	matchTemplate(gray, tmpl, score, TM_CCORR_NORMED);
+	Point result = maxima(score, 1)[0];
+	x = result.x + offset;
+	y = result.y + offset;
+}
+
 int main( int argc, const char** argv )
 {
     string filename(argv[1]);
     image = imread(filename, 1);
-    if(image.empty()) {
+    if (image.empty()) {
         printf("Cannot read image file: %s\n", filename.c_str());
         return 1;
     }
     cvtColor(image, gray, COLOR_BGR2GRAY);
     gray.convertTo(gray, CV_32FC1, 1./255);
+    if (argc == 4 && std::string(argv[2]) == "-q") {
+		radius = atoi(argv[3]);
+		float x, y;
+		quiet_run(radius, x, y);
+		printf("%.2f %.2f\n", x, y);
+		return 0;
+	}
     namedWindow(winname, 1);
     createTrackbar("T", winname, &radius, 100, onTrackbar);
     onTrackbar(0, 0);

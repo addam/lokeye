@@ -10,7 +10,7 @@ using namespace std;
 int main(int argc, char** argv)
 {
     Mat img, gray;
-    if (argc != 2 or not (img=imread(argv[1], 1)).data) {
+    if (argc < 2 or not (img=imread(argv[1], 1)).data) {
 	    VideoCapture cam{0};
 		cam.read(img);
 	}
@@ -18,6 +18,16 @@ int main(int argc, char** argv)
     // smooth it, otherwise a lot of false circles may be detected
     //GaussianBlur(gray, gray, Size(9, 9), 2, 2);
     vector<Vec3f> circles;
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		float radius = atof(argv[3]);
+	    HoughCircles(gray, circles, HOUGH_GRADIENT, 2, gray.rows/10, 200, 10, radius - 4, radius + 4);
+	    if (circles.size()) {
+			printf("%.2f %.2f\n", circles[0][0], circles[0][1]);
+			return 0;
+		} else {
+			return 1;
+		}
+	}
     HoughCircles(gray, circles, HOUGH_GRADIENT, 2, gray.rows/10, 200, 10);
     for (size_t i = 0; i < circles.size(); i++) {
          Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));

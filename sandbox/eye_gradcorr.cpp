@@ -155,6 +155,23 @@ static void onTrackbar(int, void*)
     imshow(winname, canvas);
 }
 
+void quiet_run(float radius, float &x, float &y)
+{
+    Mat grad = gradient(gray);
+	int blurSize = blurCoef * radius;
+	Point center(radius + blurSize, radius + blurSize);
+	Mat tmpl = Mat::ones(2 * center.y, 2 * center.x, CV_32FC1), result;
+	circle(tmpl, center, radius, 0.0, -1);
+	if (blurSize > 0) {
+		blur(tmpl, tmpl, Size(blurSize, blurSize));
+	}
+	tmpl = gradient(tmpl);
+	ncorr(grad, tmpl, result);
+	vector<Point> circles = maxima(result, 1, center);
+	x = circles[0].x;
+	y = circles[0].y;
+}
+
 int main(int argc, const char** argv)
 {
 	if (argc > 1) {
@@ -169,6 +186,13 @@ int main(int argc, const char** argv)
 	}
     cvtColor(image, gray, COLOR_BGR2GRAY);
     gray.convertTo(gray, CV_32FC1, 1./255);
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		radius = atof(argv[3]);
+		float x, y;
+		quiet_run(radius, x, y);
+		printf("%.2f %.2f\n", x, y);
+		return 0;
+	}
     namedWindow(winname, 1);
     createTrackbar("T", winname, &thr, 100, onTrackbar);
     createTrackbar("R", winname, &radius, min(image.rows, image.cols) / 3, onTrackbar);

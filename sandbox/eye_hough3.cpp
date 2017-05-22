@@ -130,6 +130,12 @@ int main(int argc, char **argv)
     cv::blur(img, img, cv::Size(5, 5));
 	Bitmap3 canvas(img.rows, 2 * img.cols);
 	Bitmap1 milkyway = circles(img.grayscale());
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		int pos[2];
+		cv::minMaxIdx(milkyway, 0, 0, 0, pos);
+		printf("%i %i\n", pos[1], pos[0]);
+		return 0;
+	}
 	cv::cvtColor(milkyway, canvas.colRange(0, img.cols), cv::COLOR_GRAY2BGR);
     for (Pixel p : milkyway) {
 	    if (local_maximum(milkyway, p)) {

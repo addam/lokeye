@@ -149,6 +149,12 @@ int main(int argc, char* argv[])
 	    VideoCapture cam = VideoCapture(0);
 		cam.read(img);
 	}
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		float radius = atof(argv[3]);
+		Circle c = find_eye(img, radius);
+		printf("%i %i\n", c.center.x, c.center.y);
+		return 0;
+	}
 	int max_radius = std::min(img.rows, img.cols) / 2;
 	Circle circle;
 	for (int r=1; r < max_radius; ++r) {

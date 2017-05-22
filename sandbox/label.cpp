@@ -1,17 +1,26 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-
+#include <boost/filesystem.hpp>
 #include <cstdio>
+#include <string>
+#include <algorithm>
 
+namespace fs = boost::filesystem;
 typedef unsigned char uchar;
 const char *winname = "image";
 
 float pow2(float x);
 
+inline bool is_image_format(std::string ext)
+{
+	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+	return ext == ".jpg" || ext == ".png" || ext == ".jpeg";
+}
+
 struct Circle
 {
-    float x, y, r;
+    float x, y, r=0;
     Circle() = default;
     Circle(float _x, float _y, float _r):
         x(_x), y(_y), r(_r)
@@ -127,22 +136,20 @@ void optimize(Circle &c)
 
 static void onMouse(int event, int x, int y, int, void* param)
 {
+	static int begin_x, begin_y;
+	static bool pressed = false;
 	if (event == cv::EVENT_LBUTTONDOWN or event == cv::EVENT_RBUTTONDOWN) {
-        int best_r = 15;
-        float best_val = -1e30;
-        for (int r = 5; r < 20; r++) {
-            Circle c(x, y, r);
-            float val = eval(c, g, h);
-            if (val > best_val) {
-                best_val = val;
-                best_r = r;
-            }
-        }
-        if (event == cv::EVENT_LBUTTONDOWN) {
-            left = Circle(x, y, best_r);
+		begin_x = x;
+		begin_y = y;
+		pressed = true;
+	} else if (pressed and (event == cv::EVENT_LBUTTONUP or event == cv::EVENT_RBUTTONUP)) {
+		pressed = false;
+        float r = std::hypot(x - begin_x, y - begin_y);
+        if (event == cv::EVENT_LBUTTONUP) {
+            left = Circle(begin_x, begin_y, r);
             optimize(left);
-        } else if (event == cv::EVENT_RBUTTONDOWN) {
-            right = Circle(x, y, best_r);
+        } else if (event == cv::EVENT_RBUTTONUP) {
+            right = Circle(begin_x, begin_y, r);;
             optimize(right);
         }
         cv::Mat &img = *(cv::Mat*)param;
@@ -150,14 +157,12 @@ static void onMouse(int event, int x, int y, int, void* param)
         left.draw(canvas, cv::Scalar(0,0,255));
         right.draw(canvas, cv::Scalar(0,255,0));
         cv::imshow(winname, canvas);
-    } else if (event == cv::EVENT_RBUTTONDOWN) {
-        right = Circle(x, y, 10);
     }
 }
 
-void process(char* filename)
+void process(fs::path filepath)
 {
-    cv::Mat img = cv::imread(filename);
+    cv::Mat img = cv::imread(filepath.native());
     cv::Mat gray;
     cv::cvtColor(img, gray, CV_BGR2GRAY);
     gray.convertTo(gray, CV_32F, 1./255);
@@ -175,31 +180,33 @@ void process(char* filename)
     //#define IM(name) cv::imshow(#name, name)
     //IM(g); IM(h); IM(gx); IM(gy); IM(hy);
     
+    left.r = right.r = 0;
     cv::imshow(winname, img);
     cv::setMouseCallback(winname, onMouse, &img);
     cv::waitKey();
-    printf("%4.2f %4.2f %4.2f %4.2f %4.2f %4.2f %s\n", left.x, left.y, left.r, right.x, right.y, right.r, filename);
+    printf("%s ", filepath.c_str());
+    if (left.r > 0) {
+	    printf("%4.2f %4.2f %4.2f ", left.x, left.y, left.r);
+	}
+	if (right.r > 0) {
+	    printf("%4.2f %4.2f %4.2f", right.x, right.y, right.r);
+	}
+    printf("\n");
 }
 
 int main(int argc, char* argv[])
 {
-    const char
-        rows[] = {'a', 'b', 'c'},
-        columns[] = {'1', '2', '3', '4'};
-    char filename[] = "dataset/a1a1.jpg";
-    for (char hr : rows) {
-        filename[8] = hr;
-        for (char hc : columns) {
-            filename[9] = hc;
-            for (char er : rows) {
-                filename[10] = er;
-                for (char ec : columns) {
-                    filename[11] = ec;
-                    process(filename);
-                }
-            }
-        }
-    }
-    
+	for (int i=1; i<argc; ++i) {
+		fs::path path(argv[i]);
+		if (!fs::is_directory(path)) {
+			process(path);
+		} else {
+			for (fs::directory_iterator it(path); it !=fs::directory_iterator(); ++it) {
+		        if (!fs::is_directory(*it) && is_image_format(it->path().extension().native())) {
+					process(*it);
+				}
+			}
+		}
+	}
     return EXIT_SUCCESS;
 }

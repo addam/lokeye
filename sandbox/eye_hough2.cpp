@@ -62,6 +62,13 @@ int main(int argc, char **argv)
 	}
     cv::blur(img, img, cv::Size(5, 5));
 	cv::Mat canvas;
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		float radius = atof(argv[3]);
+		int pos[2];
+		cv::minMaxIdx(circles(img.grayscale()), 0, 0, 0, pos);
+		printf("%i %i\n", pos[1], pos[0]);
+		return 0;
+	}
 	cv::log(circles(img.grayscale()) + 1, canvas);
 	cv::imshow("centers", canvas);
 	cv::imshow("original", img);

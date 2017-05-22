@@ -84,6 +84,22 @@ static void onMouse(int event, int x, int y, int, void* param)
 	}
 }
 
+void quiet_run(float radius, float &x, float &y)
+{
+	Curve circle = make_circle(radius);
+	float maximum = 0;
+	for (int i=0; i<img.rows; ++i) {
+		for (int j=0; j<img.cols; ++j) {
+			float val = eval_eye(Point(j, i), circle);
+			if (val > maximum) {
+				maximum = val;
+				x = j;
+				y = i;
+			}
+		}
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	using namespace cv;
@@ -94,6 +110,13 @@ int main(int argc, char* argv[])
 		cam.read(img);
 	}
 	grad = gradient(img);
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		float radius = atof(argv[3]);
+		float x, y;
+		quiet_run(radius, x, y);
+		printf("%.2f %.2f\n", x, y);
+		return 0;
+	}
 	Mat canvas(img.rows, 2 * img.cols, CV_32FC3);
 	img.convertTo(canvas.colRange(0, img.cols), CV_32F, 1./255);
 	float maximum = 0;

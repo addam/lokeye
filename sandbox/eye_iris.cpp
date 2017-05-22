@@ -10,9 +10,22 @@ const char *winname = "image";
 const int max_radius = 50;
 cv::Mat img, grad;
 
+const float radius_exponent = 1.5;
+const float grad_limit = 1.1;
+
 inline float pow2(float x)
 {
     return x * x;
+}
+
+float grad_func(cv::Vec2f grad, cv::Vec2f direction)
+{
+	if (direction[0] == 0 and direction[1] == 0) {
+		return 0;
+	}
+	float n = cv::norm(grad);
+	float d = grad.dot(direction) / (n * cv::norm(direction));
+	return (d > 0) ? pow2(pow2(d)) * n : 0;
 }
 
 cv::Mat gradient(const cv::Mat &img)
@@ -31,23 +44,26 @@ template<typename T>
 struct Histogram
 {
 	T mean;
-	int size;
+	//int size;
+	std::vector<T> data;
 	void insert(const T&);
 };
 
 template<typename T>
 void Histogram<T>::insert(const T &value)
 {
-	mean = mean * (size / float(size + 1)) + value / float(size + 1);
-	size += 1;
+	data.push_back(value);
+	auto mid = data.begin() + data.size() / 2;
+	std::nth_element(data.begin(), mid, data.end(), [](T l, T r) { return cv::norm(l) < cv::norm(r); });
+	mean = *mid;
+	//mean = mean * (size / float(size + 1)) + value / float(size + 1);
+	//size += 1;
 }
 
 template<typename T>
-T angle_address(const std::vector<T> &seq, cv::Vec2f v)
+T &angle_address(std::vector<T> &seq, cv::Vec2f v)
 {
-	if (v[0] == 0 and v[1] == 0) {
-		return T();
-	}
+	assert (v[0] != 0 or v[1] != 0);
 	int index = seq.size() * atan2(v[1], v[0]) / (2 * M_PI);
 	return seq.at((index + seq.size()) % seq.size());
 }
@@ -63,21 +79,23 @@ float eye_radius(Point center)
 			Vec2f diff(j - center.x, i - center.y);
 			int r = cv::norm(diff);
 			if (r < max_radius) {
-				gradsum[r] += diff.dot(grad.at<Vec2f>(p));
+				gradsum[r] += grad_func(grad.at<Vec2f>(p), diff);
 			}
 		}
 	}
 	for (int i=0; i<max_radius; ++i) {
-		gradsum[i] /= pow2(i + 1);
+		gradsum[i] /= pow(i + 1, radius_exponent);
 	}
 	return std::max_element(gradsum.begin(), gradsum.end()) - gradsum.begin();
 }
 
-float eval_eye(Point center, bool verbose=false)
+float eval_eye(Point center, bool verbose=false, int radius=0)
 {
 	using cv::Vec3b;
 	using cv::Vec2f;
-	int radius = eye_radius(center);
+	if (radius == 0) {
+		radius = eye_radius(center);
+	}
 	if (verbose)  printf("radius: %i\n", radius);
 	// calculate average over each radius
 	std::vector<Histogram<Vec3b>> circles(radius);
@@ -98,29 +116,44 @@ float eval_eye(Point center, bool verbose=false)
 		Vec2f diff(cos(alpha), sin(alpha));
 		Point p(center.x + radius * diff[0], center.y + radius * diff[1]);
 		if (p.x >= 0 and p.y >= 0 and p.x < grad.cols and p.y < grad.rows) {
-			angle_score.at(i) = std::max(0.f, diff.dot(grad.at<Vec2f>(p)));
+			angle_score.at(i) = grad_func(grad.at<Vec2f>(p), diff);
 		} else {
 			angle_score.at(i) = 0;
 		}
 	}
-	float result = 0;
-	cv::Mat canvas = verbose ? img.clone() : img;
+	cv::Mat canvas;
+	if (verbose) {
+		canvas = cv::Mat(img.rows, 2 * img.cols, CV_8UC3);
+		img.copyTo(canvas.colRange(0, img.cols));
+		img.copyTo(canvas.colRange(img.cols, 2*img.cols));
+	}
+	std::vector<float> angle_score2(2 * radius * M_PI, 0);
+	std::vector<float> angle_weight(2 * radius * M_PI, 0);
 	for (int i=std::max(0, center.y - radius); i < img.rows and i <= center.y + radius; ++i) {
 		for (int j=std::max(0, center.x - radius); j < img.cols and j <= center.x + radius; ++j) {
 			Point p(j, i);
 			Vec2f diff(j - center.x, i - center.y);
 			int r = cv::norm(diff);
-			if (r < radius) {
-				float as = angle_address(angle_score, diff);
+			if (0 < r and r < radius) {
 				float rs = std::max(0.0, 1 - cv::norm(circles.at(r).mean - img.at<Vec3b>(p)) / 20);
-				float score = as * rs;
-				result += score;
-				if (verbose)  canvas.at<Vec3b>(p) = Vec3b(0, 255, 0) * score + Vec3b(0, 0, 255) * (1 - score);
+				angle_address(angle_score2, diff) += rs;
+				angle_address(angle_weight, diff) += 1;
+				if (verbose)  canvas.at<Vec3b>(p) = Vec3b(0, 255, 0) * rs + Vec3b(0, 0, 255) * (1 - rs);
+				if (verbose)  canvas.at<Vec3b>(p + Point(img.cols, 0)) = circles[r].mean;
+			} else if (verbose and r == radius) {
+				float as = angle_address(angle_score, diff);
+				if (verbose)  canvas.at<Vec3b>(p + Point(img.cols, 0)) = Vec3b(0, 255, 0) * as + Vec3b(0, 0, 255) * (1 - as);
 			}
 		}
 	}
+	float result = 0;
+	for (int i=0; i<angle_score.size(); ++i) {
+		if (angle_weight[i] > 0) {
+			result += angle_score[i] * pow2(angle_score2[i] / angle_weight[i]);
+		}
+	}
     if (verbose)  cv::imshow(winname, canvas);
-	return result / pow(radius + 1, 1.5);
+	return result * pow(radius + 1, 2 - radius_exponent);
 }
 
 static void onMouse(int event, int x, int y, int, void* param)
@@ -136,6 +169,21 @@ static void onMouse(int event, int x, int y, int, void* param)
 	}
 }
 
+void quiet_run(float radius, float &x, float &y)
+{
+	float maximum = 0;
+	for (int i=0; i<img.rows; ++i) {
+		for (int j=0; j<img.cols; ++j) {
+			float val = eval_eye(Point(j, i), false, radius);
+			if (val > maximum) {
+				maximum = val;
+				x = j;
+				y = i;
+			}
+		}
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	using namespace cv;
@@ -146,6 +194,17 @@ int main(int argc, char* argv[])
 		cam.read(img);
 	}
 	grad = gradient(img);
+	if (argc == 4 && std::string(argv[2]) == "-q") {
+		float radius = atof(argv[3]);
+		if (radius > 30) {
+			// it would take ages to compute this
+			return 1;
+		}
+		float x, y;
+		quiet_run(radius, x, y);
+		printf("%.2f %.2f\n", x, y);
+		return 0;
+	}
 	Mat canvas(img.rows, 2 * img.cols, CV_32FC3);
 	img.convertTo(canvas.colRange(0, img.cols), CV_32F, 1./255);
 	float maximum = 0;
@@ -160,6 +219,7 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
+	printf("best score: %g\n", maximum);
 	canvas.colRange(img.cols, 2 * img.cols) /= maximum;
 	int radius = eye_radius(center);
 	circle(canvas, center, radius, Vec3f(0, 0, 1), 1);
