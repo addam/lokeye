@@ -1,0 +1,131 @@
+<script src="../sandbox/evaluation.js">
+	// measurements = [{key: [file side], values: {algo: [x, y], ...}}, ...]
+</script>
+<script>
+function distance(origin, pos)
+{
+	if (origin === undefined || pos === undefined) {
+		return Infinity;
+	}
+	var x = pos[0] - origin[0], y = pos[1] - origin[1];
+	return Math.round(Math.sqrt(x*x + y*y) * 100) / 100;
+}
+
+function cross(ctx, x, y, color)
+{
+	var l = 1.5;
+	ctx.beginPath();
+	x = Math.round(x) + 0.5;
+	y = Math.round(y) + 0.5;
+	ctx.moveTo(x - l, y);
+	ctx.lineTo(x + l, y);
+	ctx.moveTo(x, y - l);
+	ctx.lineTo(x, y + l);
+	ctx.strokeWidth = 1;
+	ctx.strokeStyle = color;
+	ctx.stroke();
+}
+
+function recalculate()
+{
+	var ground_algo = input_ground.value, sort_algo = input_sort.value;
+	var colors = {truth: "#8ae234", eye_corr: "#ef2929", eye_grad_newton: "#4e9a06", eye_gradcorr: "#a40000", eye_hough: "#f57900", eye_hough2: "#fce94f", eye_hough3: "#c17d11", eye_limbus: "#3465a4", eye_iris: "#75507b", eye_limbus2: "#19aeff"};
+	var graph = document.createElement("canvas"), graphctx = graph.getContext("2d");
+	graph.width = document.body.clientWidth - 30;
+	graph.height = 100;
+	graph.style="border: 1px solid #555753";
+	graph.magnification = 5;
+	graphctx.moveTo(0, graph.height);
+	container.innerHTML = "";
+	container.appendChild(graph);
+	for (block of measurements) {
+		var table = [];
+		var ground = block.values[ground_algo];
+		for (algo in block.values) {
+			//if (algo !== ground_algo) {
+				table.push([algo, distance(ground, block.values[algo])]);
+			//}
+		}
+		table.sort((a, b) => a[1] - b[1]);
+		block.distances = table;
+		block.sort_value = distance(ground, block.values[sort_algo]);
+		if (graph.magnification * block.sort_value > graph.height) {
+			graph.height = graph.magnification * block.sort_value;
+		}
+	}
+	measurements.sort((a, b) => a.sort_value - b.sort_value);
+	for (var i=0; i<measurements.length; i++) {
+		var block = measurements[i];
+		var table = document.createElement("table");
+		var th = table.createTHead().insertRow();
+		th.insertCell().textContent = "C";
+		th.insertCell().textContent = "algorithm";
+		th.insertCell().textContent = "distance";
+		var imgcell = th.insertCell();
+		imgcell.rowSpan = block.distances.length + 1;
+		var canvas = document.createElement("canvas");
+		canvas.width = canvas.height = 100;
+		var tmp_img = new Image();
+		tmp_img.canvas = canvas;
+		tmp_img.pos = block.values;
+		tmp_img.onload = function (evt) {
+			var img = evt.target, canvas = img.canvas, ctx = canvas.getContext("2d");
+			var pos = img.pos[ground_algo], offsx = canvas.width / 2 - pos[0], offsy = canvas.height / 2 - pos[1];
+			ctx.drawImage(img, offsx, offsy);
+			for (algo in img.pos) {
+				cross(ctx, img.pos[algo][0] + offsx, img.pos[algo][1] + offsy, colors[algo]);
+			}
+		}
+		tmp_img.src = block.key[0];
+		imgcell.appendChild(canvas);
+		for (row of block.distances) {
+			var r = table.insertRow();
+			r.insertCell().style = "background-color: " + colors[row[0]];
+			r.insertCell().textContent = row[0];
+			r.insertCell().textContent = row[1];
+		}
+		container.appendChild(table)
+		if (block.sort_value !== Infinity) {
+			graphctx.lineTo(graph.width * i / (measurements.length - 1), graph.height - graph.magnification * block.sort_value);
+		} else {
+			graphctx.lineTo(graph.width * i / (measurements.length - 1), 0);
+		}
+	}
+	graphctx.lineTo(graph.width, graph.height);
+	graphctx.fillStyle = "#888a85";
+	graphctx.fill();
+}
+window.onload = recalculate;
+</script>
+<style>
+img {float: left;}
+table tr td { border: 1px solid grey; padding: 1px 3px;}
+table {float:left; clear: left; border-collapse: collapse}
+.good {background-color: lightgreen;}
+.bad {background-color: pink;}
+</style>
+Ground truth: <select id="input_ground" onchange="recalculate()">
+<option name='truth' select>truth</option>
+<option name='eye_corr'>eye_corr</option>
+<option name='eye_grad_newton'>eye_grad_newton</option>
+<option name='eye_gradcorr'>eye_gradcorr</option>
+<option name='eye_hough'>eye_hough</option>
+<option name='eye_hough2'>eye_hough2</option>
+<option name='eye_hough3'>eye_hough3</option>
+<option name='eye_iris'>eye_iris</option>
+<option name='eye_limbus'>eye_limbus</option>
+<option name='eye_limbus2'>eye_limbus2</option>
+</select><br>
+Order by: <select id="input_sort" onchange="recalculate()">
+<option name='truth'>truth</option>
+<option name='eye_corr' select>eye_corr</option>
+<option name='eye_grad_newton'>eye_grad_newton</option>
+<option name='eye_gradcorr'>eye_gradcorr</option>
+<option name='eye_hough'>eye_hough</option>
+<option name='eye_hough2'>eye_hough2</option>
+<option name='eye_hough3'>eye_hough3</option>
+<option name='eye_iris'>eye_iris</option>
+<option name='eye_limbus'>eye_limbus</option>
+<option name='eye_limbus2'>eye_limbus2</option>
+</select>
+<div id="container"></div>

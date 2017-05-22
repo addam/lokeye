@@ -2,7 +2,7 @@
 from sys import argv, stdout
 from wand.image import Image
 from subprocess import run, PIPE
-from math import hypot
+import json
 
 def centercrop(image, x, y, r):
 	m = min(3*r, x, y, image.width - x, image.height - y)
@@ -13,7 +13,7 @@ def centercrop(image, x, y, r):
 	return result, args["left"], args["top"]
 
 sandbox = "eye_corr eye_gradcorr eye_hough eye_hough2 eye_hough3 eye_iris eye_limbus eye_limbus2 eye_grad_newton".split()
-print("algorithm", "file", "side", "distance", sep=",")
+data = list()
 for line in open("../data/ground_truth.txt"):
 	filename, *values = line.split()
 	image = Image(filename="../data/"+filename)
@@ -22,12 +22,16 @@ for line in open("../data/ground_truth.txt"):
 		sub, offset_x, offset_y = centercrop(image, true_x, true_y, true_r)
 		tmp_file = "tmp_cropped.png"
 		sub.save(filename=tmp_file)
+		block = dict()
+		block["truth"] = (true_x, true_y)
 		for program in sandbox:
 			res = run(["./"+program, tmp_file, "-q", str(true_r)], stdout=PIPE)
 			if res.returncode == 0:
 				x, y = (float(v) for v in res.stdout.decode().split())
-				fmt = "{:.2f}".format
-				distance = hypot(x + offset_x - true_x, y + offset_y - true_y)
-				print(program, filename, "LR"[i//3], fmt(distance), sep=",")
-				stdout.flush()
-				
+				block[program] = (x + offset_x, y + offset_y)
+		data.append({"key": (filename, "LR"[i//3]), "values": block})
+
+with open("evaluation.js", "w") as f:
+	f.write("var measurements = ")
+	json.dump(data, f)
+
