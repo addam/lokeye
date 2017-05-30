@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <queue>
 #include <tuple>
+#include "subpixel.hpp"
 using namespace cv;
 using namespace std;
 int radius = 20;
@@ -65,9 +66,9 @@ void quiet_run(float radius, float &x, float &y)
 	Mat tmpl = Mat::ones(2 * offset, 2 * offset, CV_32FC1), score;
 	circle(tmpl, Point(offset, offset), radius, 0.0, -1);
 	matchTemplate(gray, tmpl, score, TM_CCORR_NORMED);
-	Point result = maxima(score, 1)[0];
-	x = result.x + offset;
-	y = result.y + offset;
+	find_maximum(score, x, y);
+	x += offset;
+	y += offset;
 }
 
 int main( int argc, const char** argv )

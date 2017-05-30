@@ -1,5 +1,6 @@
 #include "../src/main.h"
 #include "../src/bitmap.h"
+#include "subpixel.hpp"
 
 Bitmap3 img;
 
@@ -131,9 +132,9 @@ int main(int argc, char **argv)
 	Bitmap3 canvas(img.rows, 2 * img.cols);
 	Bitmap1 milkyway = circles(img.grayscale());
 	if (argc == 4 && std::string(argv[2]) == "-q") {
-		int pos[2];
-		cv::minMaxIdx(milkyway, 0, 0, 0, pos);
-		printf("%i %i\n", pos[1], pos[0]);
+		float x, y;
+		find_maximum(milkyway, x, y);
+		printf("%.2f %.2f\n", x, y);
 		return 0;
 	}
 	cv::cvtColor(milkyway, canvas.colRange(0, img.cols), cv::COLOR_GRAY2BGR);

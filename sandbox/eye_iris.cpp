@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 #include <cstdio>
 #include <vector>
+#include "subpixel.hpp"
 
 using cv::Point;
 typedef unsigned char uchar;
@@ -171,17 +172,13 @@ static void onMouse(int event, int x, int y, int, void* param)
 
 void quiet_run(float radius, float &x, float &y)
 {
-	float maximum = 0;
+	cv::Mat_<float> score(img.size());
 	for (int i=0; i<img.rows; ++i) {
 		for (int j=0; j<img.cols; ++j) {
-			float val = eval_eye(Point(j, i), false, radius);
-			if (val > maximum) {
-				maximum = val;
-				x = j;
-				y = i;
-			}
+			score(i, j) = eval_eye(Point(j, i), false, radius);
 		}
 	}
+	find_maximum(score, x, y);
 }
 
 int main(int argc, char* argv[])

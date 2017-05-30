@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 #include <cstdio>
 #include <vector>
+#include "subpixel.hpp"
 
 using cv::Point;
 using cv::Vec2f;
@@ -95,25 +96,24 @@ cv::Vec3f visualize(cv::Vec2f g) {
 
 Circle find_eye(const Mat &img, float radius, bool verbose=false)
 {
-	if (radius > 40 and img.cols > 10) {
+	if (radius > 20 and img.cols > 10) {
 		Mat subimg;
 		cv::pyrDown(img, subimg);
 		float coef = img.cols / subimg.cols;
 		return find_eye(subimg, radius / coef, verbose) * coef;
 	}
-	float maximum = 0;
-	Point center;
 	Mat grad = gradient(img);
 	Curve circle = make_circle(radius);
+	cv::Mat_<float> score(grad.size());
 	for (int i=0; i<grad.rows; ++i) {
 		for (int j=0; j<grad.cols; ++j) {
-			float val = eval_eye(grad, Point(j, i), circle);
-			if (val > maximum) {
-				maximum = val;
-				center = Point(j, i);
-			}
+			score(i, j) = eval_eye(grad, Point(j, i), circle);
 		}
 	}
+	float x, y;
+	find_maximum(score, x, y);
+	Point center = {int(y), int(x)};
+	float maximum = score(center);
 	if (verbose and radius > 1) {
 		using cv::Vec3f;
 		using cv::Vec2f;
@@ -139,6 +139,28 @@ Circle find_eye(const Mat &img, float radius, bool verbose=false)
 	return Circle{center, radius, maximum};
 }
 
+void quiet_run(const Mat &img, float radius, float &x, float &y)
+{
+	if (radius > 20 and img.cols > 10) {
+		Mat subimg;
+		cv::pyrDown(img, subimg);
+		float coef = img.cols / subimg.cols;
+		quiet_run(subimg, radius / coef, x, y);
+		x *= coef;
+		y *= coef;
+		return;
+	}
+	Mat grad = gradient(img);
+	Curve circle = make_circle(radius);
+	cv::Mat_<float> score(grad.size());
+	for (int i=0; i<grad.rows; ++i) {
+		for (int j=0; j<grad.cols; ++j) {
+			score(i, j) = eval_eye(grad, Point(j, i), circle);
+		}
+	}
+	find_maximum(score, x, y);	
+}
+
 int main(int argc, char* argv[])
 {
 	using namespace cv;
@@ -151,8 +173,9 @@ int main(int argc, char* argv[])
 	}
 	if (argc == 4 && std::string(argv[2]) == "-q") {
 		float radius = atof(argv[3]);
-		Circle c = find_eye(img, radius);
-		printf("%i %i\n", c.center.x, c.center.y);
+		float x, y;
+		quiet_run(img, radius, x, y);
+		printf("%.2f %.2f\n", x, y);
 		return 0;
 	}
 	int max_radius = std::min(img.rows, img.cols) / 2;

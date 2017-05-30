@@ -1,5 +1,6 @@
 #include "../src/main.h"
 #include "../src/bitmap.h"
+#include "subpixel.hpp"
 
 Bitmap3 img;
 float pow3(float x)
@@ -64,9 +65,9 @@ int main(int argc, char **argv)
 	cv::Mat canvas;
 	if (argc == 4 && std::string(argv[2]) == "-q") {
 		float radius = atof(argv[3]);
-		int pos[2];
-		cv::minMaxIdx(circles(img.grayscale()), 0, 0, 0, pos);
-		printf("%i %i\n", pos[1], pos[0]);
+		float x, y;
+		find_maximum(circles(img.grayscale()), x, y);
+		printf("%.2f %.2f\n", x, y);
 		return 0;
 	}
 	cv::log(circles(img.grayscale()) + 1, canvas);
