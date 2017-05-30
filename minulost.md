@@ -260,3 +260,15 @@ Napsal jsem několik experimentálních programů na hledání duhovky:
 * kroskorelace s normalizovaným gradientem, a polynomem počítaným z výsledků: přijde mi to jako dobrý nápad, ale bohužel přidává několik parametrů, které je potřeba doladit,
 * ohodnocení radiální symetrie a síly gradientu na konci každého poloměru: asi nejpodrobnější model duhovky, co dovedu vymyslet. Má hodně volných parametrů a zatím nefunguje moc dobře.
 
+### Etapa od 23. května
+
+Úkoly ze schůzky:
+* v reportu zvětšit fotky (bez interpolace)
+* interpolovat výsledky subpixelově
+* vybrat sadu realistických obrázků uživatelů
+* zkusit vybrat tři metody pro hlasování (případně zkusit vylepšit)
+* jsou některé oči vyloženě špatné u všeho? na čem to selže?
+
+Další nápady:
+* spustit clustering na výsledky (možná to zodpoví předchozí otázku)
+* ohodnotit ručně ostrost, kontrast, oční stíny, odlesky, zakrytí -- a z toho pak spočítat korelaci na výsledky

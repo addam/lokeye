@@ -2,9 +2,9 @@
 
 poslední změna: 21. března
 
-## Videa
-Video musí být natočené v silném rovnoměrném osvětlení, zblízka, bez brýlí a bez výrazných hran na pozadí.
-Potřebuju natočit několik různých lidí.
+## Hledání očí
+Hledání je jednak nepřesné (potřebuju přesnost tak na čtvrt pixelu) a navíc nestabilní (příliš často duhovku nenajde, uletí).
+Je potřeba nahradit současné hledání něčím lepším.
 
 ## Sledování obličeje ve videu na disku
 Místo streamu z kamery musí jít taky otevřít soubor a nechat si ho na ukázku zpracovat.
