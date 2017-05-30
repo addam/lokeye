@@ -9,6 +9,7 @@
 namespace fs = boost::filesystem;
 typedef unsigned char uchar;
 const char *winname = "image";
+int scale = 4;
 
 float pow2(float x);
 
@@ -28,11 +29,12 @@ struct Circle
     }
     void draw(cv::Mat canvas, cv::Scalar _color) const
     {
+		float sx = scale * x, sy = scale * y, sr = scale * r;
         cv::Vec3b color(_color[0], _color[1], _color[2]);
-        for (int row = MAX(y - r, 0); row < y + r + 2 && row < canvas.rows; row++) {
+        for (int row = MAX(sy - sr, 0); row < sy + sr + 2 && row < canvas.rows; row++) {
             cv::Vec3b *img_row = canvas.ptr<cv::Vec3b>(row);
-            for (int col = MAX(x - r, 0); col < x + r + 2 && col < canvas.cols; col++) {
-                float w = 1 - std::abs(std::sqrt(pow2(row - y) + pow2(col - x)) - r);
+            for (int col = MAX(sx - sr, 0); col < sx + sr + 2 && col < canvas.cols; col++) {
+                float w = 1 - std::abs(std::sqrt(pow2(row - sy) + pow2(col - sx)) - sr);
                 if (w > 0) {
                     img_row[col] = w * color + (1-w) * img_row[col];
                 }
@@ -134,15 +136,29 @@ void optimize(Circle &c)
     }
 }
 
-static void onMouse(int event, int x, int y, int, void* param)
+static void onMouse(int event, int sx, int sy, int flag, void* param)
 {
-	static int begin_x, begin_y;
+	float x = float(sx) / scale, y = float(sy) / scale;
+	static float begin_x, begin_y;
 	static bool pressed = false;
+	static bool disabled = false;
 	if (event == cv::EVENT_LBUTTONDOWN or event == cv::EVENT_RBUTTONDOWN) {
 		begin_x = x;
 		begin_y = y;
 		pressed = true;
-	} else if (pressed and (event == cv::EVENT_LBUTTONUP or event == cv::EVENT_RBUTTONUP)) {
+		disabled = flag & cv::EVENT_FLAG_SHIFTKEY;
+	} else if (pressed and flag & cv::EVENT_FLAG_SHIFTKEY) {
+		if (flag & cv::EVENT_FLAG_LBUTTON) {
+			left.x += x - begin_x;
+			left.y += y - begin_y;
+		} else if (flag & cv::EVENT_FLAG_RBUTTON) {
+			right.x += x - begin_x;
+			right.y += y - begin_y;
+		}
+		begin_x = x;
+		begin_y = y;
+		disabled = true;
+	} else if (pressed and not disabled and (event == cv::EVENT_LBUTTONUP or event == cv::EVENT_RBUTTONUP)) {
 		pressed = false;
         float r = std::hypot(x - begin_x, y - begin_y);
         if (event == cv::EVENT_LBUTTONUP) {
@@ -152,12 +168,14 @@ static void onMouse(int event, int x, int y, int, void* param)
             right = Circle(begin_x, begin_y, r);;
             optimize(right);
         }
-        cv::Mat &img = *(cv::Mat*)param;
-        cv::Mat canvas = img.clone();
-        left.draw(canvas, cv::Scalar(0,0,255));
-        right.draw(canvas, cv::Scalar(0,255,0));
-        cv::imshow(winname, canvas);
-    }
+    } else {
+		return;
+	}
+	cv::Mat &img = *(cv::Mat*)param;
+	cv::Mat canvas = img.clone();
+	left.draw(canvas, cv::Scalar(0,0,255));
+	right.draw(canvas, cv::Scalar(0,255,0));
+	cv::imshow(winname, canvas);
 }
 
 void process(fs::path filepath)
@@ -181,9 +199,11 @@ void process(fs::path filepath)
     //IM(g); IM(h); IM(gx); IM(gy); IM(hy);
     
     left.r = right.r = 0;
+    scale = std::min(1600 / img.cols, 1000 / img.rows);
+    cv::resize(img, img, cv::Size(), scale, scale, cv::INTER_NEAREST);
     cv::imshow(winname, img);
     cv::setMouseCallback(winname, onMouse, &img);
-    cv::waitKey();
+    while (char(cv::waitKey()) != ' ');
     printf("%s ", filepath.c_str());
     if (left.r > 0) {
 	    printf("%4.2f %4.2f %4.2f ", left.x, left.y, left.r);
