@@ -89,6 +89,15 @@ Bitmap<T> Bitmap<T>::crop(Region region) const
 template<>
 bool Bitmap3::read(VideoCapture &cap)
 {
+	if (cap.get(cv::CAP_PROP_FRAME_COUNT)) {
+	    cv::Mat tmp;
+		if (not cap.read(tmp)) {
+			return false;
+		}
+	    tmp.convertTo(static_cast<DataType&>(*this), DataType().type(), 1./255);
+	    scale = 1;
+	    return true;
+	}
     while (1) {
         // make sure that we got a new image
         TimePoint time_start = std::chrono::high_resolution_clock::now();

@@ -62,7 +62,9 @@ struct Face
     void render(const Bitmap3&) const;
 };
 
-Face mark_eyes(Bitmap3&);
-Gaze calibrate(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
+Face init_interactive(const Bitmap3&);
+Face init_static(const Bitmap3&);
+Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
+Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
 
 #endif

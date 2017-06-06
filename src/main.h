@@ -16,6 +16,8 @@ using cv::VideoCapture;
 using cv::Rect;
 using Region = cv::Rect_<float>;
 using TimePoint = std::chrono::high_resolution_clock::time_point;
+using TrackingData = vector<Vector2>;
+
 
 inline Pixel to_pixel(Vector2 v)
 {

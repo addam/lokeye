@@ -21,6 +21,7 @@ int main(int argc, char** argv)
         state.refit(image);
         float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
         std::cout << "Main transformation shift: " << state.main_tsf.params.first << ", linear: " << state.main_tsf.params.second << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
+        //std::cout << "Main transformation: " << state.main_tsf.params << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
         time_start = std::chrono::high_resolution_clock::now();
         state.render(image);
     }

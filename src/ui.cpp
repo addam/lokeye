@@ -1,9 +1,10 @@
-#include "main.h"
-#include "bitmap.h"
-#include "optimization.h"
 #include <vector>
 #include <iostream>
 #include <random>
+#include "main.h"
+#include "bitmap.h"
+#include "optimization.h"
+
 const char winname[] = "fit eyes";
 
 namespace {
@@ -69,7 +70,7 @@ void onMouse(int event, int x, int y, int, void* param)
 
 }
 
-Face mark_eyes(Bitmap3 &img)
+Face init_interactive(const Bitmap3 &img)
 {
     State state(winname, img);
     do {
@@ -107,7 +108,7 @@ void Face::render(const Bitmap3 &image) const
     cv::imshow(winname, result);
 }
 
-Gaze calibrate(Face &face, VideoCapture &cap, Pixel window_size)
+Gaze calibrate_interactive(Face &face, VideoCapture &cap, Pixel window_size)
 {
     const int divisions = 3;
     const int necessary_support = 2 * divisions * divisions;

@@ -135,10 +135,15 @@ float step_length(Transformation::Params step, Region r, const Transformation &t
 
 /** Minimum argument of a quadratic function
  * function F satisfies: F(0) = f0, F(1) = f1, F'(0) = df0
+ * @returns x in range (0...1) such that F(x) is minimal
  */
 float quadratic_minimum(float f0, float f1, float df0)
 {
-    float second_order = f0 - f1 - df0;
+	if (df0 >= 0) {
+		//std::clog << "quadratic_minimum panic!" << std::endl;
+		return 0;
+	}
+    float second_order = f1 - f0 - df0;
     float minx = -0.5 * df0 / second_order;
     if (second_order < 0) {
         assert (minx < 0);
@@ -150,7 +155,7 @@ float quadratic_minimum(float f0, float f1, float df0)
     if (second_order < 0 or minx > 1) {
         return 1;
     } else {
-        return 0.9 * minx;
+        return minx;
     }
 }
 
@@ -161,7 +166,11 @@ float line_search(Transformation::Params delta_tsf, float &max_length, float &pr
     float current_energy = evaluate(tsf + length * delta_tsf, img, ref);
     while (1) {
         float slope = -delta_tsf.dot(delta_tsf) * length;
-        float coef = quadratic_minimum(current_energy, current_energy, slope);
+        if (slope > 0) {
+			printf("prev: %g, current: %g, slope: %g, fail.\n", prev_energy, current_energy, slope);
+			return 0;
+		}
+        float coef = quadratic_minimum(prev_energy, current_energy, slope);
         float next_energy = evaluate(tsf + coef * length * delta_tsf, img, ref);
         if (next_energy >= current_energy or coef == 1) {
             max_length = 2 * length;
@@ -183,25 +192,28 @@ void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img
     vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
     while (pyramid.back().second.rows >= 2 * min_size and pyramid.back().second.cols >= 2 * min_size) {
         auto &pair = pyramid.back();
-        pyramid.emplace_back(std::make_pair(pair.first.downscale(), pair.second.downscale()));
+        pyramid.emplace_back(pair.first.downscale(), pair.second.downscale());
     }
     while (not pyramid.empty()) {
         auto &pair = pyramid.back();
         Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
         float prev_energy = evaluate(tsf, pair.first, pair.second);
-        float max_length;
-        for (int iteration=0; iteration < iteration_count; ++iteration) {
-            Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
-            if (iteration == 0) {
-                max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
-            }
-            float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
-            if (length > 0) {
-                tsf += delta_tsf * length;
-            } else {
-                break;
-            }
-        }
+        //printf("evaluate (%ix%i) vs. (%ix%i) yields %g\n", pair.first.cols, pair.first.rows, pair.second.cols, pair.second.rows, prev_energy);
+        if (prev_energy > 0) {
+	        float max_length;
+	        for (int iteration=0; iteration < iteration_count; ++iteration) {
+	            Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
+	            if (iteration == 0) {
+	                max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
+	            }
+	            float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
+	            if (length > 0) {
+	                tsf += delta_tsf * length;
+	            } else {
+	                break;
+	            }
+	        }
+		}
         pyramid.pop_back();
     }
 }
@@ -247,11 +259,14 @@ void Eye::init(const Bitmap3 &img, const Transformation &tsf)
 {
     radius = tsf.scale(init_pos) * init_radius;
     const float max_distance = 2 * radius;
-    const int size = 2 * max_distance;
-    Region region(tsf(init_pos) - Vector2(max_distance, max_distance), tsf(pos) + Vector2(max_distance, max_distance));
+    const Vector2 span(max_distance, max_distance);
+    Region region(tsf(init_pos) - span, tsf(init_pos) + span);
     Bitmap1 votes(to_rect(region));
     votes = 0;
     Bitmap1 gray = img.grayscale(region);
+    if (not gray.rows or not gray.cols) {
+		printf("tsf.scale = %g, radius = %g, max_distance = %g, crop around %g, %g\n", tsf.scale(init_pos), radius, max_distance, tsf(init_pos)[0], tsf(init_pos)[1]);
+	}
     Bitmap1 dx = gray.d(0), dy = gray.d(1);
     for (Pixel p : dx) {
         Vector2 v = dx.to_world(p);
@@ -312,4 +327,35 @@ float Eye::sum_boundary_dp(const Bitmap1 &derivative, bool is_vertical, const Tr
         }
     }
     return sum_weight > 0 ? result / sum_weight : 0;
+}
+
+Face init_static(const Bitmap3 &image)
+{
+	/** @todo */
+	return init_interactive(image);
+}
+
+Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it)
+{
+    const int necessary_support = 80;
+    vector<Measurement> measurements;
+    while (1) {
+		for (int i = 0; i < necessary_support; ++i) {
+			Bitmap3 image;
+			image.read(cap);
+			state.refit(image);
+	        std::cout << " refitted " << state() << std::endl;
+			measurements.emplace_back(state(), *(it++));
+		}
+		int support = necessary_support;
+		const float precision = 150;
+		std::cout << "starting to solve..." << std::endl;
+		Gaze result(measurements, support, precision);
+		for (Measurement pair : measurements) {
+			std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << ((cv::norm(result(pair.first) - pair.second) < precision) ? " INLIER" : " out") << std::endl;
+		}
+		if (support >= necessary_support) {
+			return result;
+		}
+	}	
 }
