@@ -70,7 +70,7 @@ public:
         return Iterator{DataType::cols};
     }
     Iterator end() const {
-        return Iterator{DataType::cols, Pixel{0, DataType::rows}};
+        return DataType::cols > 0 ? Iterator{DataType::cols, Pixel{0, DataType::rows}} : begin();
     }
 };
 

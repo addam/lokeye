@@ -98,7 +98,9 @@ void Face::render(const Bitmap3 &image) const
     render_region(eye_region, eye_tsf, result);
     render_region(nose_region, nose_tsf, result);
     for (const Eye &eye : eyes) {
-        cv::circle(result, to_pixel(eye_tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+        if (result.contains(eye_tsf(eye.pos))) {
+            cv::circle(result, to_pixel(eye_tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+        }
     }
     const float font_size = 1;
     for (int i=0; i<2; i++) {

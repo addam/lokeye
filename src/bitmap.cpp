@@ -69,7 +69,7 @@ template<typename T>
 bool Bitmap<T>::contains(Vector2 world_pos) const
 {
     Pixel p = to_pixel(to_local(world_pos));
-    return p.x < DataType::cols and p.y < DataType::rows;
+    return 0 <= p.x and p.x < DataType::cols and 0 <= p.y and p.y < DataType::rows;
 }
 
 /// @todo quite probably, this copies data; that's wrong.
