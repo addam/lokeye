@@ -1,3 +1,5 @@
+// synchronization: předpokládá, že kamera přímo zabírá monitor
+// mění cyklicky barvu monitoru a zaznamenává barvu na kameře, aby šlo odhadnout zpoždění
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <chrono>
@@ -24,40 +26,42 @@ void switch_color()
     cv::waitKey(1);
 }
 
-void capture(cv::VideoCapture &cam)
+float capture(cv::VideoCapture &cam, float &time)
 {
-    static auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
+    while (1) {
+        // make sure that we got a new image
+        auto frame_start = std::chrono::steady_clock::now();
+        if (not cam.grab()) {
+            return false;
+        }
+        time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - frame_start).count() * cam.get(cv::CAP_PROP_FPS);
+        if (time > 0.5) {
+            break;
+        }
+    }
     cv::Mat img;
-    cam >> img;
-    float time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - start).count();
-    float average = hue(cv::mean(img.rowRange(img.rows/4, 3*img.rows / 4).colRange(img.cols / 4, 3*img.cols / 4)) / 255);
-    printf("%f\t%i\t%f\n", time, state, average);
+    cam.grab();
+    time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - start).count() * cam.get(cv::CAP_PROP_FPS);
+    cam.retrieve(img);
+    return hue(cv::mean(img.rowRange(img.rows/4, 3*img.rows / 4).colRange(img.cols / 4, 3*img.cols / 4)) / 255);
 }
 
 int main()
 {
     const int max_delay = 20;
+    float time;
     switch_color();
     cv::waitKey(0);
     cv::VideoCapture cam(0);
-    for (int i=0; i < max_delay; ++i) {
-        capture(cam);
-    }
-    for (int delay=0; delay < max_delay; delay += 1) {
+    for (int i=0; i<30; ++i) {
         switch_color();
-        for (int i=0; i <= delay; ++i) {
-            capture(cam);
+        for (int j=0; j < max_delay; ++j) {
+            if (std::round(capture(cam, time)) == state) {
+                printf("%i\t%f\n", j, time);
+                break;
+            }
+            printf("%i\t%f...\n", j, time);
         }
-        switch_color();
-        for (int i=0; i <= delay; ++i) {
-            capture(cam);
-        }
-        switch_color();
-        for (int i=0; i <= delay; ++i) {
-            capture(cam);
-        }
-    }
-    for (int i=0; i < max_delay; ++i) {
-        capture(cam);
     }
 }
