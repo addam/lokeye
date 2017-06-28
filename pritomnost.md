@@ -1,11 +1,11 @@
 # Aktuální plán a TODO list
 
-poslední změna: 22. června
+poslední změna: 28. června
 
 ## Text a data
 * připravit (znovu) data na hledání očí
-* vyhodnotit podrobně, jaká chyba obrázku způsobuje selhání kterého programu
 * připravit videa uživatele, který má za úkol sledovat tečku na obrazovce
+* vyhodnotit podrobně, jaká chyba obrázku způsobuje selhání kterého programu
 
 ## Hledání očí
 * přepsat programy z pískoviště do hlavní větve
@@ -22,6 +22,9 @@ poslední změna: 22. června
 ## Gaze
 * při kalibraci porovnávat aproximaci s aproximací konstantou
 * pro mřížkové přístupy přidat možnost předzpracování vstupu pomocí PCA nebo LDA
+
+## Celkově
+* naprofilovat program a zrychlit ho
 
 # Odložené myšlenky
 

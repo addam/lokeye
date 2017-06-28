@@ -272,3 +272,21 @@ Napsal jsem několik experimentálních programů na hledání duhovky:
 Další nápady:
 * spustit clustering na výsledky (možná to zodpoví předchozí otázku)
 * ohodnotit ručně ostrost, kontrast, oční stíny, odlesky, zakrytí -- a z toho pak spočítat korelaci na výsledky
+
+### Etapa od 6. června
+
+Úkoly ze schůzky:
+* poznamenat do textu práce poznámky o jednotlivých programech na oči (hotovo);
+* přeznačit fotky očí a poznamenat si, které je vyfocené s kterou chybou (nehotovo, viz níže).
+
+Další nápady:
+* Všimnul jsem si, že program někdy čte z kamery staré záběry -- kalibrace pak nutně selže.
+  Kamera navíc podle všeho průměruje dva snímky za sebou (možná aby odstranila blikání zářivky?), takže i první snímek získaný ve správný čas je nutné zahodit, a vzít až ten druhý.
+* Celkově je nevhodné, aby kalibrace pracovala s nahodilými body na obrazovce -- tracker je stavěný na plynulý pohyb.
+  Navrhnul a v pískovišti jsem připravil program, který kreslí kroužek plynule jedoucí po obrazovce.
+* Pro dokonalou synchronizaci by šlo uživatele poprosit, ať nedaleko monitoru dá zrcadlo, a zpětně z kamery vyčíst vhodný watermark.
+  Je to dost nejistá cesta, nicméně jsem jí trochu času věnoval.
+
+Přišel jsem o laptop s některými testovacími obrázky a videi.
+Obrázky stáhnu z Instagramu a označím nové.
+Testovací videa natočím jednak s Tobii, a druhak jako obyčejnou kalibrační sekvenci -- stejnou, jak probíhá při spouštění programu.
