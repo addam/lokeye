@@ -1,14 +1,5 @@
 #include "bitmap.h"
 
-namespace {
-
-float clamp(float value, float low, float high)
-{
-    return (value < low) ? low : (high < value) ? high : value;
-}
-
-}
-
 template<typename T>
 Vector2 Bitmap<T>::to_local(Vector2 v) const
 {

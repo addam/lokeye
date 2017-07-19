@@ -49,6 +49,11 @@ inline float pow2(float x)
     return x*x;
 }
 
+inline float clamp(float v, float low, float high)
+{
+    return v < low ? low : high < v ? high : v;
+}
+
 template<typename T, typename U = T>
 T exchange(T& obj, U&& new_value)
 {
