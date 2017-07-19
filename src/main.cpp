@@ -32,7 +32,7 @@ void track_interactive(Face &state, VideoCapture &cam, Gaze &fit, Pixel size)
         state.refit(image);
         Vector2 pos = fit(state());
         //std::cout << "position: " << pos(0) << ", " << pos(1) << std::endl;
-        state.render(image);
+        state.render(image, "tracking");
         if (inside(pos, size) and inside(prev_pos, size)) {
             cv::line(record, to_pixel(prev_pos), to_pixel(pos), cv::Scalar(0.5, 0.7, 1));
         }
