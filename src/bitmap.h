@@ -38,7 +38,7 @@ public:
     
     bool contains(Vector2) const;
     
-    bool read(VideoCapture&);
+    bool read(VideoCapture&, bool synchronize=false);
     bool read(const std::string&);
 
     Bitmap<T> crop(Region) const;

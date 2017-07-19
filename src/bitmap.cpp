@@ -87,29 +87,29 @@ Bitmap<T> Bitmap<T>::crop(Region region) const
 }
 
 template<>
-bool Bitmap3::read(VideoCapture &cap)
+bool Bitmap3::read(VideoCapture &cap, bool synchronize)
 {
-	if (cap.get(cv::CAP_PROP_FRAME_COUNT)) {
-	    cv::Mat tmp;
+    cv::Mat tmp;
+	if (not synchronize or cap.get(cv::CAP_PROP_FRAME_COUNT)) {
 		if (not cap.read(tmp)) {
 			return false;
 		}
-	    tmp.convertTo(static_cast<DataType&>(*this), DataType().type(), 1./255);
-	    scale = 1;
-	    return true;
-	}
-    while (1) {
-        // make sure that we got a new image
-        TimePoint time_start = std::chrono::high_resolution_clock::now();
-        if (not cap.grab()) {
-            return false;
+	} else {
+        for (int i=0; i<30; ++i) {
+            // make sure that we got a fresh frame
+            TimePoint time_start = std::chrono::high_resolution_clock::now();
+            if (not cap.grab()) {
+                return false;
+            }
+            float grabbing_time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
+            if (grabbing_time * cap.get(cv::CAP_PROP_FPS) > 0.5) {
+                break;
+            }
         }
-        if (std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count() * cap.get(cv::CAP_PROP_FPS) > 0.5) {
-            break;
-        }
+        cv::Mat tmp;
+        cap.grab();  // apparently, we need to drop one more frame
+        cap.retrieve(tmp);
     }
-    cv::Mat tmp;
-    cap.retrieve(tmp);
     tmp.convertTo(static_cast<DataType&>(*this), DataType().type(), 1./255);
     scale = 1;
     return true;
