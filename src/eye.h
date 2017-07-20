@@ -31,13 +31,15 @@ public:
     void add(FindEyePtr&&);
 };
 
+/** Subpixel Hough circle detector with fixed radius
+ */
 class HoughEye : public FindEye
 {
 public:
     virtual void refit(Circle&, const Bitmap3&) const;
 };
 
-/** Eye localizer based on gradient magnitude around the limbus
+/** Maximize sum of gradient towards the eye center
  */
 class LimbusEye : public FindEye
 {
@@ -46,5 +48,13 @@ class LimbusEye : public FindEye
 public:
     virtual void refit(Circle&, const Bitmap3&) const;
 };
+
+/** Normalized correlation with a circle
+ */
+class CorrelationEye : public FindEye
+{
+public:
+    virtual void refit(Circle&, const Bitmap3&) const;
+};    
 
 #endif // EYE_H

@@ -147,4 +147,13 @@ float LimbusEye::dp(Circle c, int direction, const Bitmap1 &derivative) const
     return sum_weight > 0 ? result / sum_weight : 0;
 }
 
-
+void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
+{
+    const Vector2 offset = Vector2(1, 1) * 1.5 * c.radius;
+	Matrix templ = Matrix::ones(2 * offset(1), 2 * offset(0));
+	cv::circle(templ, to_pixel(offset), c.radius, 0.0, -1);
+    Bitmap1 gray = img.grayscale(Region(c.center - 2 * offset, c.center + 2 * offset));
+    Bitmap1 score = gray.crop(Region(c.center - offset, c.center + offset)).clone();
+	cv::matchTemplate(gray, templ, score, cv::TM_CCORR_NORMED);
+	c.center = precise_maximum(score);
+}
