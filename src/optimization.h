@@ -4,6 +4,7 @@
 #define STRINGIFY(x) STRINGIFY2(x)
 #include STRINGIFY(TSF_HEADER)
 #include "bitmap.h"
+#include "eye.h"
 
 using Measurement = std::pair<Vector4, Vector2>;
 
@@ -14,22 +15,6 @@ struct Gaze
     Vector2 operator () (Vector4) const;
 };
 
-struct Eye
-{
-    /** Position in reference space
-     */
-    Vector2 pos;
-    Vector2 init_pos;
-    float init_radius;
-    float radius;
-    Eye(Vector2 pos, float radius) : pos{pos}, init_pos{pos}, init_radius{radius}, radius{radius} {
-    }
-    void refit(const Bitmap3&, const Transformation&);
-    void init(const Bitmap3&, const Transformation&);
-protected:
-    float sum_boundary_dp(const Bitmap1&, bool is_vertical, const Transformation&);
-};
-
 struct Face
 {
     /** Regions in reference space
@@ -38,9 +23,11 @@ struct Face
     Region eye_region;
     Region nose_region;
     
-    /** Eyes in eye space
+    /** Eyes in main reference space
      */
-    std::array<Eye, 2> eyes;
+    std::array<Circle, 2> eyes;
+    std::array<Circle, 2> fitted_eyes;
+    FindEyePtr eye_locator;
     
     /** Reference image
      */
@@ -52,10 +39,7 @@ struct Face
     Transformation eye_tsf;
     Transformation nose_tsf;
     
-    Matrix eigenfaces;
-    Matrix subspace;
-    
-    Face(const Bitmap3 &ref, Region main, Region eye, Region nose, Eye, Eye);
+    Face(const Bitmap3 &ref, Region main, Region eye, Region nose, Circle, Circle);
     Vector3 update_step(const Bitmap3 &img, const Bitmap3 &grad, const Bitmap3 &reference, int direction) const;
     void refit(const Bitmap3&, bool only_eyes=false);
     Vector4 operator() () const;

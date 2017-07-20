@@ -21,7 +21,7 @@ public:
     Initialization(const char*, const Bitmap3&);
     ~Initialization();
     void render() const;
-    Eye eye(int index) const;
+    Circle eye(int index) const;
     Region region(int index) const;
     bool done() const;
     static void onMouse(int, int, int, int, void*);
@@ -87,10 +87,10 @@ void Initialization::render() const
     cv::imshow(winname, result);
 }
 
-Eye Initialization::eye(int index) const
+Circle Initialization::eye(int index) const
 {
     assert (not is_rectangle.at(index));
-    return Eye(to_vector(record[index].first), cv::norm(record[index].second - record[index].first));
+    return {to_vector(record[index].first), cv::norm(record[index].second - record[index].first)};
 }
 
 Region Initialization::region(int index) const
@@ -247,15 +247,15 @@ void Face::render(const Bitmap3 &image, const char *winname) const
     render_region(main_region, main_tsf, result);
     render_region(eye_region, eye_tsf, result);
     render_region(nose_region, nose_tsf, result);
-    for (const Eye &eye : eyes) {
-        if (result.contains(eye_tsf(eye.pos))) {
-            cv::circle(result, to_pixel(eye_tsf(eye.pos)), eye.radius, cv::Scalar(0.5, 1.0, 0));
+    for (const Circle &eye : fitted_eyes) {
+        if (result.contains(main_tsf(eye.center))) {
+            cv::circle(result, to_pixel(main_tsf(eye.center)), main_tsf.scale(eye.center) * eye.radius, cv::Scalar(0.5, 1.0, 0));
         }
     }
     const float font_size = 1;
     for (int i=0; i<2; i++) {
-        cv::putText(result, std::to_string(eyes[i].pos[0]), Pixel(0, font_size * (24 * i + 12)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.2, 0.5, 1), font_size + 1);
-        cv::putText(result, std::to_string(eyes[i].pos[1]), Pixel(20, font_size * (24 * i + 24)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.3, 1, 0.3), font_size + 1);
+        cv::putText(result, std::to_string(eyes[i].center[0]), Pixel(0, font_size * (24 * i + 12)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.2, 0.5, 1), font_size + 1);
+        cv::putText(result, std::to_string(eyes[i].center[1]), Pixel(20, font_size * (24 * i + 24)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.3, 1, 0.3), font_size + 1);
     }
     cv::imshow(winname, result);
 }
@@ -268,7 +268,7 @@ Gaze calibrate_interactive(Face &face, VideoCapture &cap, Pixel window_size)
     std::vector<Measurement> measurements;
     for (int i=0; ; ++i) {
         session.render();
-        image.read(cap);
+        image.read(cap, true);
         face.refit(image);
         measurements.emplace_back(std::make_pair(face(), session()));
         bool do_recalc_gaze = measurements.size() % 9 == 0 and measurements.size() >= necessary_support;

@@ -80,7 +80,7 @@ Vector2 Gaze::operator () (Vector4 v) const
     return project(v, fn);
 }
 
-Face::Face(const Bitmap3 &ref, Region main_region, Region eye_region, Region nose_region, Eye left_eye, Eye right_eye):
+Face::Face(const Bitmap3 &ref, Region main_region, Region eye_region, Region nose_region, Circle left_eye, Circle right_eye):
     ref{ref.clone()},
     main_tsf{main_region},
     main_region{main_region},
@@ -187,7 +187,7 @@ float line_search(Transformation::Params delta_tsf, float &max_length, float &pr
 
 void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size=3)
 {
-    const int iteration_count = 30;
+    const int iteration_count = 2;
     Region rotregion = tsf(region);
     vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
     if (std::min({pyramid.back().first.rows, pyramid.back().first.cols, pyramid.back().second.rows, pyramid.back().second.cols}) == 0) {
@@ -230,107 +230,25 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
         refit_transformation(eye_tsf, eye_region, img, ref, 3);
         refit_transformation(nose_tsf, nose_region, img, ref, 3);
     }
-    for (Eye &eye : eyes) {
-        eye.init(img, eye_tsf);
-        eye.refit(img, eye_tsf);
+    for (int i=0; i<2; ++i) {
+        if (not eye_locator) {
+            printf("Eye tracking has not been set up.\n");
+            throw 1;
+        }
+        ///@todo Implement Transformation::operator() (Circle)
+        Circle view_eye{main_tsf(eyes[i].center), eyes[i].radius * main_tsf.scale(eyes[i].center)};
+        eye_locator->refit(view_eye, img);
+        fitted_eyes[i] = {main_tsf.inverse(view_eye.center), eyes[i].radius};
     }
 }
 
 Vector4 Face::operator () () const
 {
-    const Vector2 e = eyes[0].pos + eyes[1].pos;
+    const Vector2 e = fitted_eyes[0].center + fitted_eyes[1].center;
     const Vector2 c = (main_region.tl() + main_region.br()) / 2;
     /// @note here, we are assuming that Transformation is linear
     Vector2 difference = main_tsf.inverse(nose_tsf(c)) - main_tsf.inverse(eye_tsf(c));
     return Vector4(e[0], e[1], difference[0], difference[1]);
-}
-
-inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
-{
-    Vector2 pos = img.to_local(v);
-    const int left = pos(0), right = left + 1, y = pos(1);
-    if (left < 0 or right >= img.cols or y < 0 or y >= img.rows) {
-        return;
-    }
-    float* row = img.ptr<float>(y);
-    const float lr = pos(0) - left;
-    row[left] += weight * (1 - lr);
-    row[right] += weight * lr;
-}
-
-void Eye::init(const Bitmap3 &img, const Transformation &tsf)
-{
-    radius = tsf.scale(init_pos) * init_radius;
-    const float max_distance = 2 * radius;
-    const Vector2 span(max_distance, max_distance);
-    Region region(tsf(init_pos) - span, tsf(init_pos) + span);
-    Bitmap1 votes(to_rect(region));
-    votes = 0;
-    Bitmap1 gray = img.grayscale(region);
-    if (not gray.rows or not gray.cols) {
-		printf("tsf.scale = %g, radius = %g, max_distance = %g, crop around %g, %g\n", tsf.scale(init_pos), radius, max_distance, tsf(init_pos)[0], tsf(init_pos)[1]);
-        return;
-    }
-    Bitmap1 dx = gray.d(0), dy = gray.d(1);
-    for (Pixel p : dx) {
-        Vector2 v = dx.to_world(p);
-        Vector2 gradient(dx(p), dy(v));
-        float size = cv::norm(gradient);
-        cast_vote(votes, v - gradient * radius / size, size);
-    }
-    for (Pixel p : dy) {
-        Vector2 v = dy.to_world(p);
-        Vector2 gradient(dx(v), dy(p));
-        float size = cv::norm(gradient);
-        cast_vote(votes, v - gradient * radius / size, size);
-    }
-    Pixel result;
-    cv::minMaxLoc(votes, NULL, NULL, NULL, &result);
-    pos = tsf.inverse(votes.to_world(result));
-}
-
-void Eye::refit(const Bitmap3 &img, const Transformation &tsf)
-{
-    const int iteration_count = 5;
-    const float max_distance = 2 * radius;
-    if (cv::norm(pos - init_pos) > max_distance) {
-        pos = init_pos;
-    }
-    Pixel tsf_pos = to_pixel(tsf(pos));
-    Transformation tsf_inv = tsf.inverse();
-    const int margin = std::min(int(max_distance), iteration_count) + radius;
-    Rect bounds(tsf_pos - Pixel(1, 1) * margin, tsf_pos + Pixel(1, 1) * margin);
-    Bitmap1 gray = img.grayscale(bounds);
-    if (not gray.rows or not gray.cols) {
-        return;
-    }
-    Bitmap1 dxx = gray.d(0).d(0), dxy = gray.d(0).d(1), dyy = gray.d(1).d(1);
-    for (int iteration=0; iteration < iteration_count; iteration++) {
-        float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));
-        Vector2 delta_pos = {sum_boundary_dp(dxx, false, tsf) + sum_boundary_dp(dxy, true, tsf), sum_boundary_dp(dxy, false, tsf) + sum_boundary_dp(dyy, true, tsf)};
-        float length = std::max({std::abs(delta_pos[0]), std::abs(delta_pos[1]), 1e-5f});
-        float step = (1.f / (1 << iteration)) / length;
-        //printf("step %g * (move %g, %g)\n", step, delta_pos[0], delta_pos[1]);
-        pos = tsf_inv(tsf(pos) + step * delta_pos);
-    }
-}
-
-float Eye::sum_boundary_dp(const Bitmap1 &derivative, bool is_vertical, const Transformation &tsf)
-{
-    Vector2 center = tsf(pos);
-    /// @todo use derivative of tsf wrt. x, y for distortion into ellipse
-    float scale = 1;
-    float result = 0;
-    float sum_weight = 0;
-    for (Pixel p : derivative) {
-        Vector2 offcenter = 1./scale * (derivative.to_world(p) - center);
-        float w = 1 - std::abs(cv::norm(offcenter) - radius);
-        if (w > 0) {
-            result += w * (derivative(p) * offcenter(is_vertical ? 1 : 0)) / radius;
-            sum_weight += w;
-        }
-    }
-    return sum_weight > 0 ? result / sum_weight : 0;
 }
 
 Face init_static(const Bitmap3 &image)

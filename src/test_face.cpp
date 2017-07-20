@@ -13,17 +13,31 @@ int main(int argc, char** argv)
     #endif
     VideoCapture cam{0};
     Bitmap3 image;
-    assert (image.read(cam));
-    Face state = mark_eyes(image);
+    for (int i=0; i<10; i++) {
+        assert (image.read(cam));
+    }
+    Face state = init_interactive(image);
+    auto serial = new SerialEye;
+    FindEyePtr hough(new HoughEye);
+    FindEyePtr limbus(new LimbusEye);
+    serial->add(std::move(hough));
+    serial->add(std::move(limbus));
+    state.eye_locator.reset(serial);
+    
     std::cout << state.main_region << std::endl;
     TimePoint time_start = std::chrono::high_resolution_clock::now();
-    for (int i=0; char(cv::waitKey(5)) != 27 and image.read(cam); i++) {
+    TimePoint time_prev = time_start;
+    int i;
+    for (i=0; char(cv::waitKey(1)) != 27 and image.read(cam); ++i) {
         state.refit(image);
-        float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
+        TimePoint time_now = std::chrono::high_resolution_clock::now();
+        float duration = std::chrono::duration_cast<std::chrono::duration<float>>(time_now - time_prev).count();
         std::cout << "Main transformation shift: " << state.main_tsf.params.first << ", linear: " << state.main_tsf.params.second << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
         //std::cout << "Main transformation: " << state.main_tsf.params << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
-        time_start = std::chrono::high_resolution_clock::now();
-        state.render(image);
+        time_prev = time_now;
+        state.render(image, "tracking");
     }
+    float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
+    printf("%i frames in %g seconds ~= %g fps\n", i, duration, i / duration);
     return 0;
 }

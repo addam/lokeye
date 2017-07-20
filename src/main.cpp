@@ -89,6 +89,16 @@ float average_difference(const TrackingData &left, const TrackingData &right)
 	return sum / left.size();
 }
 
+void set_eye_finder(Face& face)
+{
+    auto serial = new SerialEye;
+    FindEyePtr hough(new HoughEye);
+    FindEyePtr limbus(new LimbusEye);
+    serial->add(std::move(hough));
+    serial->add(std::move(limbus));
+    face.eye_locator.reset(serial);
+}
+
 void display_help()
 {
 	printf("bla bla.\n");
@@ -134,11 +144,13 @@ int main(int argc, char** argv)
 	    Pixel size(1650, 1000);
 	    Face state = init_interactive(reference_image);
 		std::cout << " marked " << state() << std::endl;
+        set_eye_finder(state);
 	    Gaze fit = calibrate_interactive(state, cam, size);
 		track_interactive(state, cam, fit, size);
 	} else {
 	    Face state = (is_display_interactive) ? init_interactive(reference_image) : init_static(reference_image);
 		std::cout << " marked " << state() << std::endl;
+        set_eye_finder(state);
 		TrackingData ground_truth = read_csv(csv_filename);
 		TrackingData::const_iterator it = ground_truth.begin();
 		Gaze fit = calibrate_static(state, cam, it);

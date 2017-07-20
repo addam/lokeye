@@ -9,7 +9,7 @@ CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h
 
 LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
 # -lceres -lglog
-OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION)
+OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) eye.o
 BIN = fit_eyes
 
 all: $(BIN)
@@ -19,7 +19,7 @@ $(BIN): $(OBJS)
 
 test_bitmap: bitmap.o
 test_main: bitmap.o $(OBJ_TRANSFORMATION)
-test_face: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
+test_face: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o eye.o
 test_eigenface: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
 test_gaze: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
 test_grid_calibrate: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
