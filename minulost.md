@@ -290,3 +290,8 @@ Další nápady:
 Přišel jsem o laptop s některými testovacími obrázky a videi.
 Obrázky stáhnu z Instagramu a označím nové.
 Testovací videa natočím jednak s Tobii, a druhak jako obyčejnou kalibrační sekvenci -- stejnou, jak probíhá při spouštění programu.
+
+### 19. července
+
+* Přenesl jsem ze `sandbox/` kalibraci plynulým pohybem. Plynulá ale není, protože `Face::refit` trvá strašně dlouho.
+* Profilováním se ukazuje, že program nejvíc časů tráví interpolováním bitmapy. Tuhle část kódu asi musím přepsat úplně jinak, aby byl výpočet real-time.
