@@ -47,7 +47,7 @@ Vector2 precise_maximum(Bitmap1 score)
 	return score.to_world(origin) - Vector2{result(0), result(1)};
 }
 
-Curve make_circle(int r, bool do_shift=false)
+Curve make_circle(int r)
 {
 	Curve result;
 	for (int x=0; ; ++x) {
@@ -63,12 +63,6 @@ Curve make_circle(int r, bool do_shift=false)
 	std::transform(result.begin(), result.end() - 1, back_inserter(result), [](Pixel p) { return Pixel(p.x, -p.y); });
 	std::transform(result.begin() + 1, result.end() - 1, back_inserter(result), [](Pixel p) { return Pixel(-p.x, p.y); });
 	std::sort(result.begin(), result.end(), [](Pixel a, Pixel b) { return a.y < b.y or (a.y == b.y and a.x < b.x); });
-    if (do_shift) {
-        for (Pixel &p : result) {
-            p.x += r;
-            p.y += r;
-        }
-    }
 	return result;
 }
 
@@ -194,7 +188,6 @@ void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
     const Vector2 offset = Vector2(scale, scale) * c.radius;
 	Matrix templ = Matrix::ones(2 * offset(1) + 1, 2 * offset(0) + 1);
 	cv::circle(templ, to_pixel(offset), c.radius, 0.0, -1);
-    Bitmap1 gray = img.grayscale(to_region(2 * scale * c));
     Bitmap1 score = gray.crop(to_region(scale * c)).clone();
 	cv::matchTemplate(gray, templ, score, cv::TM_CCORR_NORMED);
 	c.center = precise_maximum(score);
@@ -232,11 +225,13 @@ void BitmapEye::refit(Circle &c, const Bitmap3 &img) const
 	c.center = precise_maximum(score);
 }
 
+/// cheap (and shifted) approximation to atan2
 int RadialEye::angle_address(Vector2 v, int bin_count)
 {
-	assert (v[0] != 0 or v[1] != 0);
-	float position = std::atan2(v[1], v[0]) / (2 * M_PI) + 1;
-	return clamp(position * bin_count, 0, bin_count - 1);
+    float x = v[0], y = v[1];
+    float angle = (std::abs(x) >= std::abs(y)) ? (y / x + (x > 0) ? 1 : 5) : (-x / y + (y > 0) ? 3 : 7);
+    assert (angle >= 0 and angle < 8);
+	return angle * bin_count / 8;
 }
 
 float RadialEye::grad_func(Vector2 grad, Vector2 direction)
@@ -297,12 +292,14 @@ float RadialEye::eval(Circle c, const Bitmap3 &img, const Bitmap1 &dx, const Bit
 	vector<Vector3> colors = radial_mean(c, img);
 	// calculate score of each angle, based on the gradient at its end
 	std::vector<float> limbus_score(angular_bins);
-    const Curve circle = make_circle(c.radius, true);
-    for (Pixel p : circle) {
-        Vector2 v = img.to_world(p);
-        Vector2 diff = v - c.center;
-        int index = angle_address(diff, angular_bins);
-        limbus_score[index] = grad_func(Vector2(dx(v), dy(v)), diff);
+    const Curve circle = make_circle(c.radius);
+    for (Pixel d : circle) {
+        Vector2 diff = to_vector(d);
+        Vector2 v = c.center + diff;
+        if (img.contains(v)) {
+            int index = angle_address(diff, angular_bins);
+            limbus_score[index] = grad_func(Vector2(dx(v), dy(v)), diff);
+        }
 	}
 	std::vector<float> iris_score(angular_bins, 0);
 	std::vector<float> iris_weight(angular_bins, 0);
