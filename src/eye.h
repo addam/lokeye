@@ -61,9 +61,12 @@ public:
  */
 class RadialEye : public FindEye
 {
+    bool use_color_median;
     float eval(Circle, const Bitmap3&, const Bitmap1&, const Bitmap1&) const;
+    vector<Vector3> radial_mean(Circle, const Bitmap3&) const;
     static float grad_func(Vector2, Vector2);
 public:
+    RadialEye(bool use_color_median=true) : use_color_median(use_color_median) {}
     virtual void refit(Circle&, const Bitmap3&) const;    
 };
 #endif // EYE_H

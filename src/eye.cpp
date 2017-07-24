@@ -207,7 +207,7 @@ float RadialEye::grad_func(Vector2 grad, Vector2 direction)
 	return (d > 0) ? pow2(pow2(d)) * n : 0;
 }
 
-vector<Vector3> radial_mean(Circle c, const Bitmap3 &img)
+vector<Vector3> RadialEye::radial_mean(Circle c, const Bitmap3 &img) const
 {
     vector<vector<Vector3>> histogram(c.radius + 1);
     for (Pixel p : img) {
@@ -219,14 +219,30 @@ vector<Vector3> radial_mean(Circle c, const Bitmap3 &img)
 	}
 	vector<Vector3> result;
     for (vector<Vector3> &bin : histogram) {
-        if (bin.empty()) {
-            result.emplace_back(0, 0, 0);
+        if (use_color_median) {
+            Vector3 best(0, 0, 0);
+            float best_cost = HUGE_VALF;
+            for (Vector3 anchor : bin) {
+                float cost = 0;
+                for (Vector3 other : bin) {
+                    cost += cv::norm(anchor - other);
+                }
+                if (cost < best_cost) {
+                    best = anchor;
+                    best_cost = cost;
+                }
+            }
+            result.push_back(best);
         } else {
-            auto mid = bin.begin() + bin.size() / 2;
-            std::nth_element(bin.begin(), mid, bin.end(), [](Vector3 l, Vector3 r) {
-                return cv::norm(l) < cv::norm(r);
-            });
-            result.push_back(*mid);
+            if (bin.empty()) {
+                result.emplace_back(0, 0, 0);
+            } else {
+                auto mid = bin.begin() + bin.size() / 2;
+                std::nth_element(bin.begin(), mid, bin.end(), [](Vector3 l, Vector3 r) {
+                    return cv::norm(l) < cv::norm(r);
+                });
+                result.push_back(*mid);
+            }
         }
     }
     return result;
