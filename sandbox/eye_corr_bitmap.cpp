@@ -7,8 +7,9 @@
 using namespace cv;
 using namespace std;
 int radius = 20;
-Mat image, gray;
-const char* winname = "cross-correlation with a circle";
+Mat image;
+vector<Mat> channels;
+const char* winname = "cross-correlation with a bitmap";
 
 bool local_maximum(const Mat &img, int i, int j)
 {
@@ -44,43 +45,64 @@ vector<Point> maxima(Mat src, unsigned count)
 	return result;
 }
 
+Mat run(float radius)
+{
+    Mat result;
+    vector<Mat> imgc;
+    cv::split(image, imgc);
+    Mat mask;
+    cv::resize(channels[3], mask, cv::Size(2*radius + 1, 2*radius + 1));
+	for (int i=0; i<3; ++i) {
+        Mat score, temp;
+        cv::resize(channels[i], temp, mask.size());
+        matchTemplate(imgc[i], temp, score, TM_CCORR_NORMED, mask);
+        if (not result.data) {
+            result = score;
+        } else {
+            result += score;
+        }
+    }
+#if 0
+    double min, max;
+    cv::minMaxIdx(result, &min, &max);
+    cv::imshow("score", (result - min) / (max - min));
+    cv::waitKey();
+#endif
+    return result;
+}
+
 static void onTrackbar(int, void*)
 {
-	const int offset = 1.5 * radius;
-	Mat tmpl = Mat::ones(2 * offset, 2 * offset, CV_32FC1), result;
-	circle(tmpl, Point(offset, offset), radius, 0.0, -1);
-	//imshow("template", tmpl);
-	matchTemplate(gray, tmpl, result, TM_CCORR_NORMED);
-	//imshow("ccor", result);
-	vector<Point> circles = maxima(result, 10);
+	Mat score = run(radius + 1);
+	vector<Point> circles = maxima(score, 10);
 	Mat canvas = image.clone();
     for (size_t i = 0; i < circles.size(); i++) {
-         circle(canvas, circles[i] + Point(offset, offset), radius, Scalar(0.0, 255*float(i)/circles.size(), 255-255*float(i)/circles.size()), 1, 8, 0);
+        circle(canvas, circles[i] + Point(radius, radius), radius, Scalar(0.0, 255*float(i)/circles.size(), 255-255*float(i)/circles.size()), 1, 8, 0);
     }
     imshow(winname, canvas);
 }
 
 void quiet_run(float radius, float &x, float &y)
 {
-	const int offset = 1.5 * radius;
-	Mat tmpl = Mat::ones(2 * offset, 2 * offset, CV_32FC1), score;
-	circle(tmpl, Point(offset, offset), radius, 0.0, -1);
-	matchTemplate(gray, tmpl, score, TM_CCORR_NORMED);
+    Mat score = run(radius);
 	find_maximum(score, x, y);
-	x += offset;
-	y += offset;
+	x += radius;
+	y += radius;
 }
 
 int main( int argc, const char** argv )
 {
     string filename(argv[1]);
     image = imread(filename, 1);
-    if (image.empty()) {
-        printf("Cannot read image file: %s\n", filename.c_str());
+    Mat temp = imread("../data/iris.png", cv::IMREAD_UNCHANGED);
+    if (image.empty() or temp.empty()) {
+        printf("Cannot read image file.\n");
         return 1;
     }
-    cvtColor(image, gray, COLOR_BGR2GRAY);
-    gray.convertTo(gray, CV_32FC1, 1./255);
+    image.convertTo(image, CV_32F, 1./255);
+    temp.convertTo(temp, CV_32F, 1./255);
+    cv::split(temp, channels);
+    printf("template has %lu channels.\n", channels.size());
     if (argc == 4 && std::string(argv[2]) == "-q") {
 		radius = atoi(argv[3]);
 		float x, y;
