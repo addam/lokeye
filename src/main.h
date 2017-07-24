@@ -25,6 +25,11 @@ struct Circle
     static Circle average(const vector<Circle>&);
 };
 
+inline Circle operator* (float coef, const Circle &c)
+{
+    return {c.center, coef * c.radius};
+}
+
 inline Pixel to_pixel(Vector2 v)
 {
     return Pixel{int(v[0]), int(v[1])};
@@ -48,6 +53,12 @@ inline Region to_region(Rect rect)
 inline Rect to_rect(Region region)
 {
     return Rect(to_pixel(region.tl()), to_pixel(region.br()));
+}
+
+inline Region to_region(Circle c)
+{
+    Vector2 margin(c.radius, c.radius);
+    return Region(c.center - margin, c.center + margin);
 }
 
 inline float pow2(float x)

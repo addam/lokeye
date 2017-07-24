@@ -17,12 +17,12 @@ int main(int argc, char** argv)
         assert (image.read(cam));
     }
     Face state = init_interactive(image);
-    auto serial = new SerialEye;
-    FindEyePtr hough(new HoughEye);
-    FindEyePtr limbus(new LimbusEye);
-    serial->add(std::move(hough));
-    serial->add(std::move(limbus));
-    state.eye_locator.reset(serial);
+    //auto serial = new SerialEye;
+    auto hough = new RadialEye;
+    //auto limbus = new CorrelationEye;
+    //serial->add(FindEyePtr(hough));
+    //serial->add(FindEyePtr(limbus));
+    state.eye_locator.reset(hough);
     
     std::cout << state.main_region << std::endl;
     TimePoint time_start = std::chrono::high_resolution_clock::now();

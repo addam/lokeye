@@ -1,25 +1,25 @@
 #include "bitmap.h"
 
 template<typename T>
-Vector2 Bitmap<T>::to_local(Vector2 v) const
+inline Vector2 Bitmap<T>::to_local(Vector2 v) const
 {
     return (v - offset) / scale;
 }
 
 template<typename T>
-Vector2 Bitmap<T>::to_world(Pixel p) const
+inline Vector2 Bitmap<T>::to_world(Pixel p) const
 {
     return to_vector(p) * scale + offset;
 }
 
 template<typename T>
-Region Bitmap<T>::to_local(Region r) const
+inline Region Bitmap<T>::to_local(Region r) const
 {
     return Region(to_local(r.tl()), to_local(r.br()));
 }
 
 template<typename T>
-Region Bitmap<T>::to_world(Rect r) const
+inline Region Bitmap<T>::to_world(Rect r) const
 {
     return Region(to_world(r.tl()), to_world(r.br()));
 }
@@ -48,6 +48,9 @@ template<typename T>
 inline T Bitmap<T>::operator() (Vector2 world_pos) const
 {
     Vector2 pos = to_local(world_pos);
+    if (scale < 0) { 
+        return DataType::template at<T>(int(clamp(pos(1), 0, DataType::rows - 1)), int(clamp(pos(0), 0, DataType::cols - 1)));
+    }
     int cols = DataType::cols - 1, rows = DataType::rows - 1;
     const T* top = DataType::template ptr<T>(clamp(pos(1), 0, rows));
     const T* bottom = DataType::template ptr<T>(clamp(pos(1) + 1, 0, rows));
@@ -57,7 +60,7 @@ inline T Bitmap<T>::operator() (Vector2 world_pos) const
 }
 
 template<typename T>
-bool Bitmap<T>::contains(Vector2 world_pos) const
+inline bool Bitmap<T>::contains(Vector2 world_pos) const
 {
     Pixel p = to_pixel(to_local(world_pos));
     return 0 <= p.x and p.x < DataType::cols and 0 <= p.y and p.y < DataType::rows;

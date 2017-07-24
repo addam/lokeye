@@ -1,5 +1,7 @@
 #include "eye.h"
 
+using Curve = std::vector<Pixel>;
+
 Circle Circle::average(const vector<Circle> &seq)
 {
     Circle result = {{0, 0}, 0};
@@ -11,6 +13,8 @@ Circle Circle::average(const vector<Circle> &seq)
     result.radius *= 1./seq.size();
     return result;
 }
+
+namespace {
 
 /** Get quadratic-interpolated maximum location in world coordinates
  */
@@ -42,6 +46,33 @@ Vector2 precise_maximum(Bitmap1 score)
 	cv::solve(polynomial.colRange(0, 2).rowRange(0, 2), polynomial.rowRange(0, 2).col(2), result);
 	return score.to_world(origin) - Vector2{result(0), result(1)};
 }
+
+Curve make_circle(int r, bool do_shift=false)
+{
+	Curve result;
+	for (int x=0; ; ++x) {
+		int y = sqrt(pow2(r) - pow2(x));
+		if (y <= x) {
+			break;
+		} else {
+			result.push_back(Pixel(x, y));
+		}
+	}
+	result.reserve(8 * result.size() - 4);
+	std::transform(result.begin(), result.end() - (result.back().x == result.back().y), back_inserter(result), [](Pixel p) { return Pixel(p.y, p.x); });
+	std::transform(result.begin(), result.end() - 1, back_inserter(result), [](Pixel p) { return Pixel(p.x, -p.y); });
+	std::transform(result.begin() + 1, result.end() - 1, back_inserter(result), [](Pixel p) { return Pixel(-p.x, p.y); });
+	std::sort(result.begin(), result.end(), [](Pixel a, Pixel b) { return a.y < b.y or (a.y == b.y and a.x < b.x); });
+    if (do_shift) {
+        for (Pixel &p : result) {
+            p.x += r;
+            p.y += r;
+        }
+    }
+	return result;
+}
+
+} // end anonymous namespace
 
 void ParallelEye::add(FindEyePtr&& child)
 {
@@ -149,11 +180,103 @@ float LimbusEye::dp(Circle c, int direction, const Bitmap1 &derivative) const
 
 void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
 {
+    ///@todo use a scale member for this
     const Vector2 offset = Vector2(1, 1) * 1.5 * c.radius;
 	Matrix templ = Matrix::ones(2 * offset(1), 2 * offset(0));
 	cv::circle(templ, to_pixel(offset), c.radius, 0.0, -1);
     Bitmap1 gray = img.grayscale(Region(c.center - 2 * offset, c.center + 2 * offset));
     Bitmap1 score = gray.crop(Region(c.center - offset, c.center + offset)).clone();
 	cv::matchTemplate(gray, templ, score, cv::TM_CCORR_NORMED);
+	c.center = precise_maximum(score);
+}
+
+template<typename T>
+T &angle_address(std::vector<T> &seq, cv::Vec2f v)
+{
+    /// @todo this should scale with 'angular bins' from RadialEye::eval
+	assert (v[0] != 0 or v[1] != 0);
+	int index = seq.size() * atan2(v[1], v[0]) / (2 * M_PI);
+	return seq.at((index + seq.size()) % seq.size());
+}
+
+template<typename T>
+struct Histogram
+{
+	T mean;
+	//int size;
+	std::vector<T> data;
+	void insert(const T&);
+};
+
+template<typename T>
+void Histogram<T>::insert(const T &value)
+{
+	data.push_back(value);
+	auto mid = data.begin() + data.size() / 2;
+	std::nth_element(data.begin(), mid, data.end(), [](T l, T r) { return cv::norm(l) < cv::norm(r); });
+	mean = *mid;
+	//mean = mean * (size / float(size + 1)) + value / float(size + 1);
+	//size += 1;
+}
+
+float RadialEye::grad_func(Vector2 grad, Vector2 direction)
+{
+	if (direction[0] == 0 and direction[1] == 0) {
+		return 0;
+	}
+	float n = cv::norm(grad);
+	float d = grad.dot(direction) / (n * cv::norm(direction));
+	return (d > 0) ? pow2(pow2(d)) * n : 0;
+}
+
+float RadialEye::eval(Circle c, const Bitmap3 &img, const Bitmap1 &dx, const Bitmap1 &dy) const
+{
+    const int radial_bins = c.radius, angular_bins = 2 * c.radius * M_PI;
+	// calculate average over each radius
+	std::vector<Histogram<Vector3>> circles(radial_bins);
+    const Bitmap3 square = img.crop(to_region(c));
+    for (Pixel p : square) {
+        Vector2 diff = square.to_world(p) - c.center;
+        int r = cv::norm(diff);
+        if (r < radial_bins) {
+            circles[r].insert(square(p));
+        }
+	}
+	// calculate score of each angle, based on the gradient at its end
+	std::vector<float> limbus_score(angular_bins);
+    const Curve circle = make_circle(c.radius, true);
+    for (Pixel p : circle) {
+        Vector2 v = square.to_world(p);
+        Vector2 diff = v - c.center;
+        angle_address(limbus_score, diff) = grad_func(Vector2(dx(v), dy(v)), diff);
+	}
+	std::vector<float> iris_score(angular_bins, 0);
+	std::vector<float> iris_weight(angular_bins, 0);
+	for (Pixel p : square) {
+        Vector2 diff = square.to_world(p) - c.center;
+        int r = cv::norm(diff);
+        if (r < radial_bins and r != 0) {
+            float rs = std::max(0.0, 1 - cv::norm(circles[r].mean - square(p)) / 20);
+            angle_address(iris_score, diff) += rs;
+            angle_address(iris_weight, diff) += 1;
+        }
+	}
+	float result = 0;
+	for (int i=0; i<angular_bins; ++i) {
+		if (iris_weight[i] > 0) {
+			result += limbus_score[i] * pow2(iris_score[i] / iris_weight[i]);
+		}
+	}
+	return result;
+}
+
+void RadialEye::refit(Circle &c, const Bitmap3 &img) const
+{
+    Bitmap1 gray = img.grayscale(to_region(2 * c));
+    const Bitmap1 dx = gray.d(0), dy = gray.d(1);
+	Bitmap1 score = gray.crop(to_region(c));
+    for (Pixel p : score) {
+        score(p) = eval(Circle{score.to_world(p), c.radius}, img, dx, dy);
+	}
 	c.center = precise_maximum(score);
 }

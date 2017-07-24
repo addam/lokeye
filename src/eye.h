@@ -57,4 +57,13 @@ public:
     virtual void refit(Circle&, const Bitmap3&) const;
 };    
 
+/** Model based on radial symmetry of the iris and pupil
+ */
+class RadialEye : public FindEye
+{
+    float eval(Circle, const Bitmap3&, const Bitmap1&, const Bitmap1&) const;
+    static float grad_func(Vector2, Vector2);
+public:
+    virtual void refit(Circle&, const Bitmap3&) const;    
+};
 #endif // EYE_H
