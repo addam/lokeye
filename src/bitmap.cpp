@@ -66,7 +66,6 @@ inline bool Bitmap<T>::contains(Vector2 world_pos) const
     return 0 <= p.x and p.x < DataType::cols and 0 <= p.y and p.y < DataType::rows;
 }
 
-/// @todo quite probably, this copies data; that's wrong.
 template<typename T>
 Bitmap<T> Bitmap<T>::crop(Region region) const
 {
