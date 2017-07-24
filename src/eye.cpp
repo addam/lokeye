@@ -72,6 +72,11 @@ Curve make_circle(int r, bool do_shift=false)
 	return result;
 }
 
+void error_message(Circle c)
+{
+    printf(" empty bitmap around eye (%g, %g)\n", c.center[0], c.center[1]);
+}
+
 } // end anonymous namespace
 
 void ParallelEye::add(FindEyePtr&& child)
@@ -124,7 +129,7 @@ void HoughEye::refit(Circle &c, const Bitmap3 &img) const
     votes = 0;
     Bitmap1 gray = img.grayscale(region);
     if (not gray.rows or not gray.cols) {
-		printf(" empty bitmap around eye (%g, %g)\n", c.center[0], c.center[1]);
+        error_message(c);
         return;
     }
     Bitmap1 dx = gray.d(0), dy = gray.d(1);
@@ -151,6 +156,7 @@ void LimbusEye::refit(Circle &c, const Bitmap3 &img) const
     Region bounds(c.center - margin, c.center + margin);
     Bitmap1 gray = img.grayscale(bounds);
     if (not gray.rows or not gray.cols) {
+        error_message(c);
         return;
     }
     Bitmap1 dxx = gray.d(0).d(0), dxy = gray.d(0).d(1), dyy = gray.d(1).d(1);
@@ -180,6 +186,11 @@ float LimbusEye::dp(Circle c, int direction, const Bitmap1 &derivative) const
 
 void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
 {
+    Bitmap1 gray = img.grayscale(to_region(2 * scale * c));
+    if (not gray.rows or not gray.cols) {
+        error_message(c);
+        return;
+    }
     const Vector2 offset = Vector2(scale, scale) * c.radius;
 	Matrix templ = Matrix::ones(2 * offset(1) + 1, 2 * offset(0) + 1);
 	cv::circle(templ, to_pixel(offset), c.radius, 0.0, -1);
@@ -317,6 +328,10 @@ float RadialEye::eval(Circle c, const Bitmap3 &img, const Bitmap1 &dx, const Bit
 void RadialEye::refit(Circle &c, const Bitmap3 &img) const
 {
     Bitmap1 gray = img.grayscale(to_region(2 * c));
+    if (not gray.rows or not gray.cols) {
+        error_message(c);
+        return;
+    }
     const Bitmap1 dx = gray.d(0), dy = gray.d(1);
 	Bitmap1 score = gray.crop(to_region(c));
     for (Pixel p : score) {
