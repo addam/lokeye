@@ -180,20 +180,51 @@ float LimbusEye::dp(Circle c, int direction, const Bitmap1 &derivative) const
 
 void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
 {
-    ///@todo use a scale member for this
-    const Vector2 offset = Vector2(1, 1) * 1.5 * c.radius;
-	Matrix templ = Matrix::ones(2 * offset(1), 2 * offset(0));
+    const Vector2 offset = Vector2(scale, scale) * c.radius;
+	Matrix templ = Matrix::ones(2 * offset(1) + 1, 2 * offset(0) + 1);
 	cv::circle(templ, to_pixel(offset), c.radius, 0.0, -1);
-    Bitmap1 gray = img.grayscale(Region(c.center - 2 * offset, c.center + 2 * offset));
-    Bitmap1 score = gray.crop(Region(c.center - offset, c.center + offset)).clone();
+    Bitmap1 gray = img.grayscale(to_region(2 * scale * c));
+    Bitmap1 score = gray.crop(to_region(scale * c)).clone();
 	cv::matchTemplate(gray, templ, score, cv::TM_CCORR_NORMED);
 	c.center = precise_maximum(score);
 }
 
-int angle_address(cv::Vec2f v, int bin_count)
+BitmapEye::BitmapEye(const std::string filename, float radius_scale, float neighborhood):
+    radius_scale(radius_scale),
+    scale(neighborhood)
+{
+    cv::Mat tmp = cv::imread(filename, cv::IMREAD_UNCHANGED);
+    tmp.convertTo(tmp, CV_32F, 1./255);
+    cv::split(tmp, templ);
+    assert(templ.size() >= 3);
+}
+
+void BitmapEye::refit(Circle &c, const Bitmap3 &img) const
+{
+    Bitmap3 square = img.crop(to_region(scale * c));
+    int radius = c.radius / radius_scale;
+    cv::Size size(2 * radius + 1, 2 * radius + 1);
+    /// @todo these calculations work only when img.scale == 1
+    Bitmap1 score(square.rows - size.height + 1, square.cols - size.width + 1, c.center - to_vector(size / 2));
+    vector<Matrix> square_channels;
+    cv::split(square, square_channels);
+    Matrix mask;
+    if (templ.size() > 3) {
+        cv::resize(templ[3], mask, size);
+    }
+	for (int i=0; i<3; ++i) {
+        Matrix score_channel, templ_channel;
+        cv::resize(templ[i], templ_channel, size);
+        matchTemplate(square_channels[i], templ_channel, score_channel, cv::TM_CCORR_NORMED, mask);
+        score += score_channel;
+    }
+	c.center = precise_maximum(score);
+}
+
+int RadialEye::angle_address(Vector2 v, int bin_count)
 {
 	assert (v[0] != 0 or v[1] != 0);
-	float position = atan2(v[1], v[0]) / (2 * M_PI) + 1;
+	float position = std::atan2(v[1], v[0]) / (2 * M_PI) + 1;
 	return clamp(position * bin_count, 0, bin_count - 1);
 }
 

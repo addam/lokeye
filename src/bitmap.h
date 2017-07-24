@@ -3,6 +3,11 @@
 
 #include "main.h"
 
+/** A wrapper to the OpenCV "typed matrix" class
+ * OpenCV supports constant-time cropping of bitmaps
+ * but one has to keep track of the coordinate frame.
+ * This class manages the coordinates properly, even when scaling and calculating derivatives.
+ */
 template<typename T>
 class Bitmap : public cv::Mat_<T>
 {

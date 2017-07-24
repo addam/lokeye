@@ -45,6 +45,11 @@ inline Vector2 to_vector(cv::Point_<float> p)
     return Vector2(p.x, p.y);
 }
 
+inline Vector2 to_vector(cv::Size size)
+{
+    return Vector2(size.width, size.height);
+}
+
 inline Region to_region(Rect rect)
 {
     return Region(to_vector(rect.tl()), to_vector(rect.br()));
