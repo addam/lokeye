@@ -44,25 +44,23 @@ int main(int argc, char** argv)
     vector<std::tuple<string, FindEye*>> algorithms = {
         {"hough", new HoughEye},
         {"correlation", new CorrelationEye},
+        {"bitmap", new BitmapEye("../data/iris.png", 85 / 100.f)},
         {"limbus", new LimbusEye},
         {"radial", new RadialEye(false)},
-        {"bitmap", new BitmapEye("../data/iris.png", 85 / 100.f)},
     };
 
     std::ios_base::sync_with_stdio(false);
     vector<Annotation> annotations = read_csv(std::cin);
     std::ios_base::sync_with_stdio(true);
     
-    string relpath = (argc > 1) ? argv[1] : "";
+    string basepath = (argc > 1) ? argv[1] : "";
     using std::get;
     const int repeat = 1;
     Bitmap3 image;
     for (const auto &row : annotations) {
-        //std::clog << "read " << (relpath + get<0>(row)) << std::endl;
-        image.read(relpath + get<1>(row));
+        image.read(basepath + get<1>(row));
         printf("%s\n", get<0>(row).c_str());
         for (const auto &algo : algorithms) {
-            //std::clog << get<0>(algo) << std::endl;
             for (int i=0; i<repeat; ++i) {
                 Circle c = get<2>(row);
                 c.center += random(c.radius);

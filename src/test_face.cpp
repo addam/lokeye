@@ -2,15 +2,9 @@
 #include "bitmap.h"
 #include "optimization.h"
 #include <iostream>
-#ifdef WITH_CERES
-#include <glog/logging.h>
-#endif
 
 int main(int argc, char** argv)
 {
-    #ifdef WITH_CERES
-    google::InitGoogleLogging("face.refit");
-    #endif
     VideoCapture cam{0};
     Bitmap3 image;
     for (int i=0; i<10; i++) {
@@ -20,17 +14,17 @@ int main(int argc, char** argv)
     if (0) {
         auto serial = new SerialEye;
         auto hough = new HoughEye;
-        auto limbus = new CorrelationEye;
+        auto limbus = new LimbusEye;
         serial->add(FindEyePtr(hough));
         serial->add(FindEyePtr(limbus));
         state.eye_locator.reset(serial);
     } else if (0) {
-        auto radial = new RadialEye(false);
-        state.eye_locator.reset(radial);
+        state.eye_locator.reset(new CorrelationEye);
+    } else if (1) {
+        state.eye_locator.reset(new RadialEye(false));
     } else {
         // eye diameter is 85 / 100 of the image size
-        auto bitmap = new BitmapEye("../data/iris.png", 85 / 100.f);
-        state.eye_locator.reset(bitmap);
+        state.eye_locator.reset(new BitmapEye("../data/iris.png", 85 / 100.f));
     }
     
     std::cout << state.main_region << std::endl;

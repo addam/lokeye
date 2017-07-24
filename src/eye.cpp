@@ -1,4 +1,5 @@
 #include "eye.h"
+#include <iostream>
 
 using Curve = std::vector<Pixel>;
 
@@ -22,20 +23,23 @@ Vector2 precise_maximum(Bitmap1 score)
 {
 	cv::Point origin;
 	cv::minMaxLoc(score, 0, 0, 0, &origin);
-	origin.x = std::max(1, std::min(origin.x, score.cols - 2));
-	origin.y = std::max(1, std::min(origin.y, score.rows - 2));
+	origin.x = clamp(origin.x, 1, score.cols - 2);
+	origin.y = clamp(origin.y, 1, score.rows - 2);
 	Matrix system, rhs;
 	for (int x=-1; x<=1; ++x) {
 		for (int y=-1; y<=1; ++y) {
-			Matrix tmp(1, 6);
-			tmp(0) = x*x;
-			tmp(1) = x*y;
-			tmp(2) = x;
-			tmp(3) = y*y;
-			tmp(4) = y;
-			tmp(5) = 1;
-			system.push_back(tmp);
-			rhs.push_back(score.at<float>(cv::Point(x, y) + origin));
+            float s = score(Pixel(x, y) + origin);
+            if (std::isfinite(s)) {
+                Matrix tmp(1, 6);
+                tmp(0) = x*x;
+                tmp(1) = x*y;
+                tmp(2) = x;
+                tmp(3) = y*y;
+                tmp(4) = y;
+                tmp(5) = 1;
+                system.push_back(tmp);
+                rhs.push_back(s);
+            }
 		}
 	}
 	Matrix v;
@@ -44,7 +48,8 @@ Vector2 precise_maximum(Bitmap1 score)
 	polynomial << 2*v(0), v(1), v(2), v(1), 2*v(3), v(4), v(2), v(4), 2*v(5);
 	Matrix result;
 	cv::solve(polynomial.colRange(0, 2).rowRange(0, 2), polynomial.rowRange(0, 2).col(2), result);
-	return score.to_world(origin) - Vector2{result(0), result(1)};
+    Vector2 offset(clamp(result(0), -1, 1), clamp(result(1), -1, 1));
+    return score.to_world(origin) - offset;
 }
 
 Curve make_circle(int r)
@@ -222,7 +227,15 @@ void BitmapEye::refit(Circle &c, const Bitmap3 &img) const
         matchTemplate(square_channels[i], templ_channel, score_channel, cv::TM_CCORR_NORMED, mask);
         score += score_channel;
     }
-	c.center = precise_maximum(score);
+    Pixel pmax;
+	cv::minMaxLoc(score, 0, 0, 0, &pmax);
+    Vector2 discrete = score.to_world(pmax);
+    Vector2 interp = precise_maximum(score);
+    if (std::abs(discrete[0] - interp[0]) + std::abs(discrete[1] - interp[1]) < 2) {
+        c.center = interp;
+    } else {
+        c.center = discrete;
+    }
 }
 
 /// cheap (and shifted) approximation to atan2
