@@ -3,18 +3,6 @@
 
 using Curve = std::vector<Pixel>;
 
-Circle Circle::average(const vector<Circle> &seq)
-{
-    Circle result = {{0, 0}, 0};
-    for (const Circle &c : seq) {
-        result.center += c.center;
-        result.radius += c.radius;
-    }
-    result.center *= 1./seq.size();
-    result.radius *= 1./seq.size();
-    return result;
-}
-
 namespace {
 
 /** Get quadratic-interpolated maximum location in world coordinates
@@ -83,15 +71,63 @@ void ParallelEye::add(FindEyePtr&& child)
     children.emplace_back(std::move(child));
 }
 
-void ParallelEye::refit(Circle &c, const Bitmap3 &img) const
+int subset_size(int mask)
 {
-    vector<Circle> votes;
-    for (const auto &child : children) {
-        votes.push_back(c);
-        child->refit(votes.back(), img);
-        ///@todo if any subset has estimated stddev < 1px, return its average
+    int result = 0;
+    for (; mask; mask >>= 1) {
+        result += mask & 1;
     }
-    c = Circle::average(votes);
+    return result;
+}
+
+Vector2 subset_mean(const vector<Vector2> &points, int mask)
+{
+    Vector2 sum;
+    for (int i = 1; i <= mask; i <<= 1) {
+        if (i & mask) {
+            sum += points[i];
+        }
+    }
+    return sum / subset_size(mask);    
+}
+
+float subset_variance(const vector<Vector2> &points, int mask)
+{
+    Vector2 mean = subset_mean(points, mask);
+    float variance;
+    for (int i = 1; i <= mask; i <<= 1) {
+        if (i & mask) {
+            variance += cv::norm(points[i] - mean, cv::NORM_L2SQR);
+        }
+    }
+    return variance / (subset_size(mask) - 1);
+}
+
+void ParallelEye::refit(Circle &circle, const Bitmap3 &img) const
+{
+    if (children.empty()) {
+        return;
+    } else if (children.size() == 1) {
+        children.front()->refit(circle, img);
+        return;
+    }
+    vector<Vector2> votes;
+    for (const auto &child : children) {
+        Circle copy = circle;
+        child->refit(copy, img);
+        votes.push_back(copy.center);
+    }
+    float best_variance = HUGE_VALF;
+    for (int i=0; i < (1 << votes.size()); ++i) {
+        if (subset_size(i) < 2) {
+            continue;
+        }
+        float var = subset_variance(votes, i);
+        if (var < best_variance) {
+            circle.center = subset_mean(votes, i);
+            best_variance = var;
+        }
+    }
 }
 
 void SerialEye::add(FindEyePtr&& child)

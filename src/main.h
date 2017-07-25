@@ -22,7 +22,6 @@ struct Circle
 {
     Vector2 center;
     float radius;
-    static Circle average(const vector<Circle>&);
 };
 
 inline Circle operator* (float coef, const Circle &c)
