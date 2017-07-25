@@ -150,7 +150,7 @@ void HoughEye::refit(Circle &c, const Bitmap3 &img) const
 
 void LimbusEye::refit(Circle &c, const Bitmap3 &img) const
 {
-    const int iteration_count = 5;
+    constexpr int iteration_count = 5;
     const Vector2 margin = Vector2(1, 1) * (iteration_count + c.radius);
     Region bounds(c.center - margin, c.center + margin);
     Bitmap1 gray = img.grayscale(bounds);
@@ -163,7 +163,7 @@ void LimbusEye::refit(Circle &c, const Bitmap3 &img) const
         float weight = (2 * iteration < iteration_count) ? 1 : 1.f / (1 << (iteration / 2 - iteration_count / 4));
         Vector2 delta_pos = {dp(c, 0, dxx) + dp(c, 1, dxy), dp(c, 0, dxy) + dp(c, 1, dyy)};
         float length = std::max({std::abs(delta_pos(0)), std::abs(delta_pos(1)), 1e-5f});
-        float step = (1.f / (1 << iteration)) / length;
+        float step = (max_distance / (1 << iteration)) / length;
         c.center += step * delta_pos;
     }
 }
@@ -192,6 +192,9 @@ void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
     }
     const Vector2 offset = Vector2(scale, scale) * c.radius;
 	Matrix templ = Matrix::ones(2 * offset(1) + 1, 2 * offset(0) + 1);
+    if (gray.rows < templ.rows or gray.cols < templ.cols) {
+        return;
+    }
 	cv::circle(templ, to_pixel(offset), c.radius, 0.0, -1);
     Bitmap1 score = gray.crop(to_region(scale * c)).clone();
 	cv::matchTemplate(gray, templ, score, cv::TM_CCORR_NORMED);
@@ -213,6 +216,9 @@ void BitmapEye::refit(Circle &c, const Bitmap3 &img) const
     Bitmap3 square = img.crop(to_region(scale * c));
     int radius = c.radius / radius_scale;
     cv::Size size(2 * radius + 1, 2 * radius + 1);
+    if (square.rows < size.height or square.cols < size.width) {
+        return;
+    }
     /// @todo these calculations work only when img.scale == 1
     Bitmap1 score(square.rows - size.height + 1, square.cols - size.width + 1, c.center - to_vector(size / 2));
     vector<Matrix> square_channels;

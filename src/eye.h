@@ -43,9 +43,11 @@ public:
  */
 class LimbusEye : public FindEye
 {
+    const float max_distance;
     /// Derivative of the energy function wrt. center coordinate `direction`
     float dp(Circle, int direction, const Bitmap1&) const;
 public:
+    LimbusEye(float max_distance=1) : max_distance(max_distance) { }
     virtual void refit(Circle&, const Bitmap3&) const;
 };
 
