@@ -3,6 +3,30 @@
 #include "optimization.h"
 #include <iostream>
 
+// locrot tracker
+void print(const std::pair<Vector2, float> &params)
+{
+    std::cout << "Main transformation shift: " << params.first << ", angle: " << params.second << std::endl;
+}    
+
+// affine tracker
+void print(const std::pair<Vector2, Matrix22> &params)
+{
+    std::cout << "Main transformation shift: " << params.first << ", linear: " << params.second << std::endl;
+}    
+
+// barycentric tracker
+void print(const Matrix23 &params)
+{
+    std::cout << "Main transformation: " << params << std::endl;
+}
+
+// perspective tracker
+void print(const Matrix33 &params)
+{
+    std::cout << "Main transformation: " << params << std::endl;
+}
+
 int main(int argc, char** argv)
 {
     VideoCapture cam{0};
@@ -35,8 +59,9 @@ int main(int argc, char** argv)
         state.refit(image);
         TimePoint time_now = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::duration<float>>(time_now - time_prev).count();
-        std::cout << "Main transformation shift: " << state.main_tsf.params.first << ", linear: " << state.main_tsf.params.second << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
         //std::cout << "Main transformation: " << state.main_tsf.params << ", face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
+        print(state.main_tsf.params);
+        std::cout << "Face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
         time_prev = time_now;
         state.render(image, "tracking");
     }
