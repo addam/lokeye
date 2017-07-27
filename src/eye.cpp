@@ -155,6 +155,14 @@ inline void cast_vote(Bitmap1 &img, Vector2 v, float weight)
     row[right] += weight * lr;
 }
 
+bool HoughEye::hsv_bounded(Vector3 hsv) const
+{
+    float h = hsv[0] / 360, s = hsv[1], v = hsv[2];
+    float hl = hsv_low[0], sl = hsv_low[1], vl = hsv_low[2];
+    float hh = hsv_high[0], sh = hsv_high[1], vh = hsv_high[2];
+    return h >= hl and h <= hh and s >= sl and s <= sh and v >= vl and v <= vh;
+}
+
 void HoughEye::refit(Circle &c, const Bitmap3 &img) const
 {
     const float max_distance = 2 * c.radius;
@@ -167,15 +175,26 @@ void HoughEye::refit(Circle &c, const Bitmap3 &img) const
         error_message(c);
         return;
     }
+    bool use_hsv_mask = (hsv_low != Vector3(0, 0, 0) or hsv_high != Vector3(1, 1, 1));
+    Bitmap3 hsv;
+    if (use_hsv_mask) {
+        cv::cvtColor(img, hsv, cv::COLOR_BGR2HSV);
+    }
     Bitmap1 dx = gray.d(0), dy = gray.d(1);
     for (Pixel p : dx) {
         Vector2 v = dx.to_world(p);
+        if (use_hsv_mask and hsv_bounded(hsv(v))) {
+            continue;
+        }
         Vector2 gradient(dx(p), dy(v));
         float size = cv::norm(gradient);
         cast_vote(votes, v - gradient * c.radius / size, size);
     }
     for (Pixel p : dy) {
         Vector2 v = dy.to_world(p);
+        if (use_hsv_mask and hsv_bounded(hsv(v))) {
+            continue;
+        }
         Vector2 gradient(dx(v), dy(p));
         float size = cv::norm(gradient);
         cast_vote(votes, v - gradient * c.radius / size, size);

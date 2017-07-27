@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     Face state = (is_interactive) ? init_interactive(image) : init_static(image);
     if (1) {
         auto serial = new SerialEye;
-        serial->add(FindEyePtr(new HoughEye));
+        serial->add(FindEyePtr(new HoughEye(Vector3(0.7, 0, 0))));
         serial->add(FindEyePtr(new LimbusEye));
         state.eye_locator.reset(serial);
     } else if (0) {

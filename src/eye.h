@@ -35,7 +35,11 @@ public:
  */
 class HoughEye : public FindEye
 {
+    const Vector3 hsv_low;
+    const Vector3 hsv_high;
+    bool hsv_bounded(Vector3) const;
 public:
+    HoughEye(Vector3 hsv_low={0,0,0}, Vector3 hsv_high={1,1,1}) : hsv_low(hsv_low), hsv_high(hsv_high) { }
     virtual void refit(Circle&, const Bitmap3&) const;
 };
 
