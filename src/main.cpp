@@ -101,7 +101,9 @@ void set_eye_finder(Face& face)
 
 void display_help()
 {
-	printf("Usage: fit_eyes [index of webcam] [video.avi [ground_truth.csv]]\n");
+	printf("Usage: fit_eyes [-i] [-v] [index of webcam] [video.avi [ground_truth.csv]]\n");
+	printf("\t-i:\tinteractive (mark the face by hand)\n");
+	printf("\t-v:\tverbose\n");
 }
 
 int main(int argc, char** argv)
