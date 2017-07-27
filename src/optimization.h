@@ -47,7 +47,7 @@ struct Face
 };
 
 Face init_interactive(const Bitmap3&);
-Face init_static(const Bitmap3&, Region);
+Face init_static(const Bitmap3&, const string &face_xml="/usr/local/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml", const string &eye_xml="/usr/local/share/OpenCV/haarcascades/haarcascade_eye_tree_eyeglasses.xml");
 Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
 

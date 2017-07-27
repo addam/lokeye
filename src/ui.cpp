@@ -225,7 +225,7 @@ Face init_interactive(const Bitmap3 &img)
     Initialization session("mark face", img);
     do {
         if (char(cv::waitKey(100)) == 27) {
-            exit(0);
+            throw NoFaceException();
         }
     } while (not session.done());
     Face result{img, session.region(0), session.region(1), session.region(2), session.eye(3), session.eye(4)};

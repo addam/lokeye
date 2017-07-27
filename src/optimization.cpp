@@ -4,6 +4,7 @@
 #include "homography.h"
 #include <iostream>
 #include <random>
+#include <opencv2/objdetect.hpp>
 
 template<int size>
 vector<Measurement> random_sample(const vector<Measurement> &pairs)
@@ -255,10 +256,37 @@ Vector4 Face::operator () () const
     return Vector4(e[0], e[1], difference[0], difference[1]);
 }
 
-Face init_static(const Bitmap3 &image, Region region)
+Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye_xml)
 {
-    Face result{image, region, Region(10, 10, 20, 20), Region(10, 10, 20, 20), {Vector2(20, 20), 5}, {Vector2(20, 20), 5}};
-    return result;
+    cv::CascadeClassifier face_cl(face_xml);
+    cv::CascadeClassifier eye_cl(eye_xml);
+
+    Bitmap1 gray = image.grayscale();
+    cv::equalizeHist(gray, gray);
+
+    std::vector<Rect> faces;
+    face_cl.detectMultiScale(gray, faces, 1.1, 2, cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
+    if (faces.empty()) {
+        throw NoFaceException();
+    }
+    Region parent = to_region(faces.front());
+    float scale = parent.height;
+    std::vector<Rect> eye_rects;
+    Bitmap1 crop = gray(parent);
+    eye_cl.detectMultiScale(crop, eye_rects, 1.1, 2, cv::CASCADE_SCALE_IMAGE, cv::Size(scale/6, scale/6), cv::Size(scale/4, scale/4));
+    if (eye_rects.size() < 2) {
+        throw NoFaceException();
+    }
+    std::array<Circle, 2> eyes;
+    for (int i=0; i<2; ++i) {
+        Rect r = eye_rects[i];
+        eyes[i].center = (crop.to_world(r.tl()) + crop.to_world(r.br())) / 2;
+        eyes[i].radius = scale / 30;
+    }
+    ///@todo fixme init grid children if asked for it
+    Region upper(parent.x + 0.4*scale, parent.y + 0.25*scale, 0.2*scale, 0.2*scale);
+    Region lower(parent.x + 0.4*scale, parent.y + 0.45*scale, 0.2*scale, 0.2*scale);
+    return Face{image, parent, upper, lower, eyes[0], eyes[1]};
 }
 
 Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it)

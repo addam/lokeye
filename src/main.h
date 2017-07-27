@@ -90,4 +90,9 @@ inline array<Vector2, 4> extract_points(Region region)
 {
 	return {region.tl(), {region.br().x, region.tl().y}, region.br(), {region.tl().x, region.br().y}};
 }
+
+class NoFaceException : public std::exception
+{
+};
+
 #endif // MAIN_H

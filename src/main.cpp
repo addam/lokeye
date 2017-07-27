@@ -108,11 +108,11 @@ int main(int argc, char** argv)
 {
 	string video_filename, csv_filename;
 	int camera_index = 0;
-	bool is_display_interactive = false, is_verbose = false;
+	bool is_interactive = false, is_verbose = false;
 	for (int i=1; i<argc; ++i) {
 		string arg(argv[i]);
 		if (arg == "-i") {
-			is_display_interactive = true;
+			is_interactive = true;
 		} else if (arg == "-v") {
 			is_verbose = true;
 		} else if (arg == "-h") {
@@ -140,22 +140,24 @@ int main(int argc, char** argv)
 		assert(reference_image.read(cam));
 		cam = VideoCapture{video_filename};
 	}
-	if (video_filename.empty()) {
-	    Pixel size(1650, 1000);
-	    Face state = init_interactive(reference_image);
-		std::cout << " marked " << state() << std::endl;
+    try {
+        Face state = (is_interactive) ? init_interactive(reference_image) : init_static(reference_image);
+        std::cout << " marked " << state() << std::endl;
         set_eye_finder(state);
-	    Gaze fit = calibrate_interactive(state, cam, size);
-		track_interactive(state, cam, fit, size);
-	} else {
-	    Face state = (is_display_interactive) ? init_interactive(reference_image) : init_static(reference_image);
-		std::cout << " marked " << state() << std::endl;
-        set_eye_finder(state);
-		TrackingData ground_truth = read_csv(csv_filename);
-		TrackingData::const_iterator it = ground_truth.begin();
-		Gaze fit = calibrate_static(state, cam, it);
-		TrackingData measurement = track_static(state, cam, fit, it);
-		printf("average difference %g\n", average_difference(measurement, ground_truth));
-	}
+        if (video_filename.empty()) {
+            Pixel size(1650, 1000);
+            Gaze fit = calibrate_interactive(state, cam, size);
+            track_interactive(state, cam, fit, size);
+        } else {
+            TrackingData ground_truth = read_csv(csv_filename);
+            TrackingData::const_iterator it = ground_truth.begin();
+            Gaze fit = calibrate_static(state, cam, it);
+            TrackingData measurement = track_static(state, cam, fit, it);
+            printf("average difference %g\n", average_difference(measurement, ground_truth));
+        }
+    } catch (NoFaceException) {
+        std::cerr << "No face initialized." << std::endl;
+        return 1;
+    }
     return 0;
 }
