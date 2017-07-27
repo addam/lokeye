@@ -101,7 +101,7 @@ void set_eye_finder(Face& face)
 
 void display_help()
 {
-	printf("bla bla.\n");
+	printf("Usage: fit_eyes [index of webcam] [video.avi [ground_truth.csv]]\n");
 }
 
 int main(int argc, char** argv)
