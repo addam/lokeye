@@ -27,32 +27,43 @@ void print(const Matrix33 &params)
     std::cout << "Main transformation: " << params << std::endl;
 }
 
-int main(int argc, char** argv)
+void match(Face &state, const Bitmap3 &ref, const Bitmap3 &view, bool is_verbose)
 {
-    using std::atof;
-    Bitmap3 ref, view;
-    assert(ref.read(argv[1]));
-    assert(view.read(argv[2]));
-    Region r;
-    if (argc >= 7) {
-        r.x = atof(argv[3]);
-        r.y = atof(argv[4]);
-        r.width = atof(argv[5]);
-        r.height = atof(argv[6]);
-    }
-    Face state = (r.x > 0) ? init_static(ref, r) : init_interactive(ref);
-    if (argc < 7) {
-        Region r = state.main_region;
-        std::cout << r.x << ' ' << r.y << ' ' << r.width << ' ' << r.height << std::endl;
-    }
     TimePoint time_start = std::chrono::high_resolution_clock::now();
+    state.render(ref, "reference");
     state.refit(view);
     TimePoint time_now = std::chrono::high_resolution_clock::now();
     float duration = std::chrono::duration_cast<std::chrono::duration<float>>(time_now - time_start).count();
     printf("%g seconds ~= %g fps\n", duration, 1 / duration);
-    print(state.main_tsf.params);
-    std::cout << "Face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
-    state.render(view, "tracking");
+    if (is_verbose) {
+        print(state.main_tsf.params);
+        std::cout << "Face parameters: " << state() << ", " << 1 / duration << " fps" << std::endl;
+    }
+    state.render(view, "view");
     cv::waitKey();
+}
+
+int main(int argc, char** argv)
+{
+	bool is_interactive = false, is_verbose = false;
+	for (int i=1; i<argc; ++i) {
+		string arg(argv[i]);
+		if (arg == "-i") {
+			is_interactive = true;
+		} else if (arg == "-v") {
+			is_verbose = true;
+        }
+    }
+    using std::atof;
+    Bitmap3 ref, view;
+    assert(ref.read(argv[1]));
+    assert(view.read(argv[2]));
+    try {
+        Face state = (is_interactive) ? init_interactive(ref) : init_static(ref);
+        match(state, ref, view, is_verbose);
+    } catch (NoFaceException) {
+        std::cerr << "No face initialized." << std::endl;
+        return 1;
+    }
     return 0;
 }
