@@ -29,25 +29,32 @@ void print(const Matrix33 &params)
 
 int main(int argc, char** argv)
 {
+	bool is_interactive = false, is_verbose = false;
+	for (int i=1; i<argc; ++i) {
+		string arg(argv[i]);
+		if (arg == "-i") {
+			is_interactive = true;
+		} else if (arg == "-v") {
+			is_verbose = true;
+        }
+    }
     VideoCapture cam{0};
     Bitmap3 image;
     for (int i=0; i<10; i++) {
         assert (image.read(cam));
     }
-    Face state = init_interactive(image);
-    if (0) {
+    Face state = (is_interactive) ? init_interactive(image) : init_static(image);
+    if (1) {
         auto serial = new SerialEye;
-        auto hough = new HoughEye;
-        auto limbus = new LimbusEye;
-        serial->add(FindEyePtr(hough));
-        serial->add(FindEyePtr(limbus));
+        serial->add(FindEyePtr(new HoughEye));
+        serial->add(FindEyePtr(new LimbusEye));
         state.eye_locator.reset(serial);
     } else if (0) {
         state.eye_locator.reset(new CorrelationEye);
     } else if (1) {
         state.eye_locator.reset(new RadialEye(false));
     } else {
-        // eye diameter is 85 / 100 of the image size
+        // iris diameter is 85 / 100 of the size of this image
         state.eye_locator.reset(new BitmapEye("../data/iris.png", 85 / 100.f));
     }
     

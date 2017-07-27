@@ -188,7 +188,7 @@ float line_search(Transformation::Params delta_tsf, float &max_length, float &pr
 
 void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size=3)
 {
-    const int iteration_count = 5;
+    const int iteration_count = 2;
     Region rotregion = tsf(region);
     vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
     if (std::min({pyramid.back().first.rows, pyramid.back().first.cols, pyramid.back().second.rows, pyramid.back().second.cols}) == 0) {
@@ -258,21 +258,25 @@ Vector4 Face::operator () () const
 
 Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye_xml)
 {
+    using CharMat = cv::Mat_<unsigned char>;
     cv::CascadeClassifier face_cl(face_xml);
     cv::CascadeClassifier eye_cl(eye_xml);
-
-    Bitmap1 gray = image.grayscale();
-    cv::equalizeHist(gray, gray);
+    
+    CharMat gray;
+    cv::Mat tmp;
+    cv::cvtColor(image, tmp, cv::COLOR_BGR2GRAY);
+    tmp.convertTo(gray, CV_8U, 255);
+    equalizeHist(gray, gray);
 
     std::vector<Rect> faces;
     face_cl.detectMultiScale(gray, faces, 1.1, 2, cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
     if (faces.empty()) {
         throw NoFaceException();
     }
-    Region parent = to_region(faces.front());
+    Rect parent = faces.front();
     float scale = parent.height;
     std::vector<Rect> eye_rects;
-    Bitmap1 crop = gray(parent);
+    CharMat crop = gray(parent);
     eye_cl.detectMultiScale(crop, eye_rects, 1.1, 2, cv::CASCADE_SCALE_IMAGE, cv::Size(scale/6, scale/6), cv::Size(scale/4, scale/4));
     if (eye_rects.size() < 2) {
         throw NoFaceException();
@@ -280,13 +284,13 @@ Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye
     std::array<Circle, 2> eyes;
     for (int i=0; i<2; ++i) {
         Rect r = eye_rects[i];
-        eyes[i].center = (crop.to_world(r.tl()) + crop.to_world(r.br())) / 2;
-        eyes[i].radius = scale / 30;
+        eyes[i].center = image.to_world(parent.tl() + (r.tl() + r.br()) / 2);
+        eyes[i].radius = 0.04 * scale;
     }
     ///@todo fixme init grid children if asked for it
     Region upper(parent.x + 0.4*scale, parent.y + 0.25*scale, 0.2*scale, 0.2*scale);
     Region lower(parent.x + 0.4*scale, parent.y + 0.45*scale, 0.2*scale, 0.2*scale);
-    return Face{image, parent, upper, lower, eyes[0], eyes[1]};
+    return Face{image, to_region(parent), upper, lower, eyes[0], eyes[1]};
 }
 
 Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it)
