@@ -109,7 +109,7 @@ bool Bitmap3::read(VideoCapture &cap, bool synchronize)
 }
 
 template<>
-bool Bitmap3::read(const std::string &filename)
+bool Bitmap3::read(const string &filename)
 {
     cv::Mat tmp = cv::imread(filename, cv::IMREAD_COLOR);
     tmp.convertTo(static_cast<DataType&>(*this), DataType().type(), 1./255);

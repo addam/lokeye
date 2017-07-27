@@ -69,7 +69,7 @@ class BitmapEye : public FindEye
     float radius_scale;
     vector<Matrix> templ;
 public:
-    BitmapEye(const std::string filename, float radius_scale=1, float neighborhood=2);
+    BitmapEye(const string filename, float radius_scale=1, float neighborhood=2);
     virtual void refit(Circle&, const Bitmap3&) const;
 };    
 

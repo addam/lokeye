@@ -2,7 +2,6 @@
 #include "eye.h"
 #include <iostream>
 
-using std::string;
 using Annotation = std::tuple<string, string, Circle>;
 
 float getfloat(std::stringstream &ss, string delim=",")

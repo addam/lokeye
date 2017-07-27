@@ -7,10 +7,12 @@
 #include <array>
 #include <vector>
 #include <chrono>
+#include <string>
 #include "vector_math.h"
 
 using std::vector;
 using std::array;
+using std::string;
 using Pixel = cv::Point;
 using cv::VideoCapture;
 using cv::Rect;

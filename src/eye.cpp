@@ -237,7 +237,7 @@ void CorrelationEye::refit(Circle &c, const Bitmap3 &img) const
 	c.center = precise_maximum(score);
 }
 
-BitmapEye::BitmapEye(const std::string filename, float radius_scale, float neighborhood):
+BitmapEye::BitmapEye(const string filename, float radius_scale, float neighborhood):
     radius_scale(radius_scale),
     scale(neighborhood)
 {

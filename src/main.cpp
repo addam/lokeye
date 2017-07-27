@@ -11,12 +11,12 @@ bool inside(Vector2 pos, Pixel size)
     return pos(0) >= 0 and pos(1) >= 0 and pos(0) < size.x and pos(1) < size.y;
 }
 
-std::string replace_extension(const std::string &filename, const std::string &extension)
+string replace_extension(const string &filename, const string &extension)
 {
 	return filename.substr(0, filename.rfind('.')) + extension;
 }
 
-bool is_numeric(const std::string str)
+bool is_numeric(const string str)
 {
 	return std::all_of(str.begin(), str.end(), [](char c) { return std::isdigit(c); });
 }
@@ -58,17 +58,17 @@ TrackingData track_static(Face &state, VideoCapture &cam, Gaze &fit, TrackingDat
 	return result;
 }
 
-TrackingData read_csv(const std::string &filename)
+TrackingData read_csv(const string &filename)
 {
 	TrackingData result;
 	std::ifstream is(filename);
 	while (1) {
-		std::string line;
+		string line;
 		std::getline(is, line);
 		std::stringstream line_s(line);
 		Vector2 value;
 		for (int i=0; i<2; ++i) {
-			std::string cell;
+			string cell;
 			std::getline(line_s, cell, ',');
 			if (cell.empty()) {
 				return result;
@@ -106,11 +106,11 @@ void display_help()
 
 int main(int argc, char** argv)
 {
-	std::string video_filename, csv_filename;
+	string video_filename, csv_filename;
 	int camera_index = 0;
 	bool is_display_interactive = false, is_verbose = false;
 	for (int i=1; i<argc; ++i) {
-		std::string arg(argv[i]);
+		string arg(argv[i]);
 		if (arg == "-i") {
 			is_display_interactive = true;
 		} else if (arg == "-v") {
