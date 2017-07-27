@@ -30,6 +30,7 @@ test_%: test_%.cpp
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 rig_eye: bitmap.o eye.o
+rig_face: bitmap.o optimization.o $(OBJ_TRANSFORMATION) ui.o
 rig_%: rig_%.cpp
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 

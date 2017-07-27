@@ -187,7 +187,7 @@ float line_search(Transformation::Params delta_tsf, float &max_length, float &pr
 
 void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size=3)
 {
-    const int iteration_count = 2;
+    const int iteration_count = 5;
     Region rotregion = tsf(region);
     vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
     if (std::min({pyramid.back().first.rows, pyramid.back().first.cols, pyramid.back().second.rows, pyramid.back().second.cols}) == 0) {
@@ -232,13 +232,17 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
     }
     for (int i=0; i<2; ++i) {
         if (not eye_locator) {
-            printf("Eye tracking has not been set up.\n");
-            throw 1;
+            static bool has_notified = false;
+            if (not has_notified) {
+                has_notified = true;
+                fprintf(stderr, "Eye tracking has not been set up.\n");
+            }
+        } else {
+            ///@todo Implement Transformation::operator() (Circle)
+            Circle view_eye{main_tsf(eyes[i].center), eyes[i].radius * main_tsf.scale(eyes[i].center)};
+            eye_locator->refit(view_eye, img);
+            fitted_eyes[i] = {main_tsf.inverse(view_eye.center), eyes[i].radius};
         }
-        ///@todo Implement Transformation::operator() (Circle)
-        Circle view_eye{main_tsf(eyes[i].center), eyes[i].radius * main_tsf.scale(eyes[i].center)};
-        eye_locator->refit(view_eye, img);
-        fitted_eyes[i] = {main_tsf.inverse(view_eye.center), eyes[i].radius};
     }
 }
 
@@ -251,10 +255,10 @@ Vector4 Face::operator () () const
     return Vector4(e[0], e[1], difference[0], difference[1]);
 }
 
-Face init_static(const Bitmap3 &image)
+Face init_static(const Bitmap3 &image, Region region)
 {
-	/** @todo */
-	return init_interactive(image);
+    Face result{image, region, Region(10, 10, 20, 20), Region(10, 10, 20, 20), {Vector2(20, 20), 5}, {Vector2(20, 20), 5}};
+    return result;
 }
 
 Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it)

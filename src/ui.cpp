@@ -245,13 +245,13 @@ void Face::render(const Bitmap3 &image, const char *winname) const
 {
     Bitmap3 result = image.clone();
     render_region(main_region, main_tsf, result);
-    render_region(eye_region, eye_tsf, result);
-    render_region(nose_region, nose_tsf, result);
-    for (const Circle &eye : fitted_eyes) {
-        if (result.contains(main_tsf(eye.center))) {
-            cv::circle(result, to_pixel(main_tsf(eye.center)), main_tsf.scale(eye.center) * eye.radius, cv::Scalar(0.5, 1.0, 0));
-        }
-    }
+    //render_region(eye_region, eye_tsf, result);
+    //render_region(nose_region, nose_tsf, result);
+    //for (const Circle &eye : fitted_eyes) {
+        //if (result.contains(main_tsf(eye.center))) {
+            //cv::circle(result, to_pixel(main_tsf(eye.center)), main_tsf.scale(eye.center) * eye.radius, cv::Scalar(0.5, 1.0, 0));
+        //}
+    //}
     const float font_size = 1;
     for (int i=0; i<2; i++) {
         cv::putText(result, std::to_string(eyes[i].center[0]), Pixel(0, font_size * (24 * i + 12)), cv::FONT_HERSHEY_PLAIN, font_size, cv::Scalar(0.2, 0.5, 1), font_size + 1);

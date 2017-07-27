@@ -47,7 +47,7 @@ struct Face
 };
 
 Face init_interactive(const Bitmap3&);
-Face init_static(const Bitmap3&);
+Face init_static(const Bitmap3&, Region);
 Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
 
