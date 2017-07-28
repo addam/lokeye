@@ -81,12 +81,11 @@ Vector2 Gaze::operator () (Vector4 v) const
     return project(v, fn);
 }
 
-Face::Face(const Bitmap3 &ref, Region main_region, Region eye_region, Region nose_region, Circle left_eye, Circle right_eye):
+Face::Face(const Bitmap3 &ref, Region main_region, Circle left_eye, Circle right_eye):
     ref{ref.clone()},
     main_tsf{main_region},
     main_region{main_region},
-    eye_region{eye_region},
-    nose_region{nose_region},
+    children{ref, main_region},
     eyes{left_eye, right_eye}
 {
 }
@@ -186,7 +185,7 @@ float line_search(Transformation::Params delta_tsf, float &max_length, float &pr
     }
 }
 
-void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size=3)
+void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size)
 {
     const int iteration_count = 2;
     Region rotregion = tsf(region);
@@ -226,10 +225,7 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
     if (not only_eyes) {
         refit_transformation(main_tsf, main_region, img, ref, 5);
-        eye_tsf = main_tsf;
-        nose_tsf = main_tsf;
-        refit_transformation(eye_tsf, eye_region, img, ref, 3);
-        refit_transformation(nose_tsf, nose_region, img, ref, 3);
+        children.refit(img, main_tsf);
     }
     for (int i=0; i<2; ++i) {
         if (not eye_locator) {
@@ -250,9 +246,8 @@ void Face::refit(const Bitmap3 &img, bool only_eyes)
 Vector4 Face::operator () () const
 {
     const Vector2 e = fitted_eyes[0].center + fitted_eyes[1].center;
-    const Vector2 c = (main_region.tl() + main_region.br()) / 2;
     /// @note here, we are assuming that Transformation is linear
-    Vector2 difference = main_tsf.inverse(nose_tsf(c)) - main_tsf.inverse(eye_tsf(c));
+    Vector2 difference = children(main_tsf);
     return Vector4(e[0], e[1], difference[0], difference[1]);
 }
 
@@ -288,9 +283,7 @@ Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye
         eyes[i].radius = 0.04 * scale;
     }
     ///@todo fixme init grid children if asked for it
-    Region upper(parent.x + 0.4*scale, parent.y + 0.25*scale, 0.2*scale, 0.2*scale);
-    Region lower(parent.x + 0.4*scale, parent.y + 0.45*scale, 0.2*scale, 0.2*scale);
-    return Face{image, to_region(parent), upper, lower, eyes[0], eyes[1]};
+    return Face{image, to_region(parent), eyes[0], eyes[1]};
 }
 
 Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it)

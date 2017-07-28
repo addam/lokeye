@@ -3,12 +3,14 @@ OPTIMIZE = -O2 -ffast-math -march=native
 CXXFLAGS = $(OPTIMIZE) -std=c++11 -fopenmp -Werror=return-type -g
 LDFLAGS = $(LIBS) -L/usr/local/lib
 TRANSFORMATION = affine
+CHILDREN = markers
 OBJ_TRANSFORMATION = transformation_$(TRANSFORMATION).o
+OBJ_CHILDREN = children_$(CHILDREN).o
 OBJ_OPTIMIZATION = optimization.o
-CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h
+CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h -DCHL_HEADER=children_$(CHILDREN).h
 
-LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
-OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) eye.o
+LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_objdetect
+OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDREN) eye.o
 BIN = fit_eyes
 
 all: $(BIN)
@@ -18,7 +20,7 @@ $(BIN): $(OBJS)
 
 test_bitmap: bitmap.o
 test_main: bitmap.o $(OBJ_TRANSFORMATION)
-test_face: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o eye.o
+test_face: ui.o bitmap.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDREN) eye.o
 test_eigenface: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
 test_gaze: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
 test_grid_calibrate: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o

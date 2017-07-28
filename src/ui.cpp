@@ -15,7 +15,7 @@ class Initialization
     const char *winname;
     const Bitmap3 &canvas;
     vector<Drag> record;
-    const std::array<bool, 5> is_rectangle{{true, true, true, false, false}};
+    const std::array<bool, 3> is_rectangle = {true, false, false};
     bool pressed = false;
 public:
     Initialization(const char*, const Bitmap3&);
@@ -228,7 +228,7 @@ Face init_interactive(const Bitmap3 &img)
             throw NoFaceException();
         }
     } while (not session.done());
-    Face result{img, session.region(0), session.region(1), session.region(2), session.eye(3), session.eye(4)};
+    Face result{img, session.region(0), session.eye(1), session.eye(2)};
     return result;
 }
 
@@ -245,8 +245,6 @@ void Face::render(const Bitmap3 &image, const char *winname) const
 {
     Bitmap3 result = image.clone();
     render_region(main_region, main_tsf, result);
-    render_region(eye_region, eye_tsf, result);
-    render_region(nose_region, nose_tsf, result);
     for (const Circle &eye : fitted_eyes) {
         if (result.contains(main_tsf(eye.center))) {
             cv::circle(result, to_pixel(main_tsf(eye.center)), main_tsf.scale(eye.center) * eye.radius, cv::Scalar(0.5, 1.0, 0));
