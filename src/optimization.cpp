@@ -85,7 +85,7 @@ Face::Face(const Bitmap3 &ref, Region main_region, Circle left_eye, Circle right
     ref{ref.clone()},
     main_tsf{main_region},
     main_region{main_region},
-    children{ref, main_region},
+    children{this->ref, main_region},
     eyes{left_eye, right_eye}
 {
 }

@@ -245,6 +245,7 @@ void Face::render(const Bitmap3 &image, const char *winname) const
 {
     Bitmap3 result = image.clone();
     render_region(main_region, main_tsf, result);
+    children.render(result);
     for (const Circle &eye : fitted_eyes) {
         if (result.contains(main_tsf(eye.center))) {
             cv::circle(result, to_pixel(main_tsf(eye.center)), main_tsf.scale(eye.center) * eye.radius, cv::Scalar(0.5, 1.0, 0));

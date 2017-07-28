@@ -1,3 +1,4 @@
+#include <opencv2/highgui.hpp>
 #include "children_markers.h"
 #include "optimization.h"
 
@@ -28,4 +29,16 @@ Vector2 Children::operator()(const Transformation &parent_tsf) const
         centers.emplace_back(inv(m.first(to_vector(r.tl() + r.br()) / 2)));
     }
     return centers.at(1) - centers.at(0);
+}
+
+void Children::render(Bitmap3 &canvas) const
+{
+    for (const Marker &m : markers) {
+        Vector2 tl = to_vector(m.second.tl()), br = to_vector(m.second.br());
+        std::array<Vector2, 4> vertices{tl, Vector2(tl[0], br[1]), br, Vector2(br[0], tl[1])};
+        std::for_each(vertices.begin(), vertices.end(), [m](Vector2 &v) { v = m.first(v); });
+        for (int i = 0; i < 4; i++) {
+            cv::line(canvas, to_pixel(vertices[i]), to_pixel(vertices[(i+1)%4]), cv::Scalar(0, 0.8, 1.0));
+        }
+    }
 }
