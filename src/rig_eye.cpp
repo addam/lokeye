@@ -4,6 +4,8 @@
 
 using Annotation = std::tuple<string, string, Circle>;
 
+auto rng = cv::theRNG();
+
 float getfloat(std::stringstream &ss, string delim=",")
 {
     static string tmp;
@@ -33,19 +35,31 @@ vector<Annotation> read_csv(std::istream &in)
     return result;
 }
 
-Vector2 random(float radius)
+Vector2 random(float r)
 {
-    return {0, 0}; /// @todo fixme
+    return {rng.uniform(-r, r), rng.uniform(-r, r)};
 }
 
 int main(int argc, char** argv)
 {
+    auto s1 = new SerialEye;
+    s1->add(FindEyePtr(new HoughEye));
+    s1->add(FindEyePtr(new LimbusEye));
+    auto s2 = new SerialEye;
+    auto p2 = new ParallelEye;
+    p2->add(FindEyePtr(new HoughEye));
+    p2->add(FindEyePtr(new CorrelationEye));
+    p2->add(FindEyePtr(new RadialEye(false)));
+    s2->add(FindEyePtr(p2));
+    s2->add(FindEyePtr(new LimbusEye));
     vector<std::tuple<string, FindEye*>> algorithms = {
         {"hough", new HoughEye},
         {"correlation", new CorrelationEye},
         {"bitmap", new BitmapEye("../data/iris.png", 85 / 100.f)},
-        {"limbus", new LimbusEye},
+        {"limbus", new LimbusEye(10)},
         {"radial", new RadialEye(false)},
+        {"hough>limbus", s1},
+        {"hough|correlation|radial>limbus", s2},
     };
 
     std::ios_base::sync_with_stdio(false);
@@ -54,7 +68,7 @@ int main(int argc, char** argv)
     
     string basepath = (argc > 1) ? argv[1] : "";
     using std::get;
-    const int repeat = 1;
+    const int repeat = 3;
     Bitmap3 image;
     for (const auto &row : annotations) {
         image.read(basepath + get<1>(row));
