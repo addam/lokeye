@@ -37,12 +37,6 @@ Matrix33 decanonize(PointPack points, int derivative=3)
     return system;
 }
 
-Vector2 extract_point(Params p, unsigned index)
-{
-    assert (index < 4);
-    return Vector2(p[2*index + 0], p[2*index + 1]);
-}
-
 vector<std::pair<Vector2, Vector2>> zip_measurements(const PointPack &left, const PointPack &right)
 {
 	vector<std::pair<Vector2, Vector2>> result;
@@ -85,6 +79,12 @@ decltype(Transformation::canonize_matrix) canonize_all_permutations(PointPack po
     return result;
 }
 
+}
+
+Vector2 extract_point(Params p, unsigned index)
+{
+    assert (index < 4);
+    return Vector2(p[2*index + 0], p[2*index + 1]);
 }
 
 Transformation::Transformation():
@@ -150,6 +150,13 @@ Transformation& Transformation::operator += (Params delta)
     return *this;
 }
 
+Transformation& Transformation::increment(Vector2 delta, int index)
+{
+    points[index] += delta;
+    update_params(homography<3, 3>(zip_measurements(static_params, points)));
+    return *this;
+}
+
 Vector2 Transformation::operator () (Vector2 v) const
 {
     return project(v, params);
@@ -193,7 +200,7 @@ Transformation Transformation::operator () (Transformation other) const
 
 float Transformation::scale(Vector2 v) const
 {
-    return (params(0, 0) * params(1, 1)) / (params.row(2) * homogenize(v))[0];
+    return (params(0, 0) * params(1, 1) / params(2, 2)) / (params.row(2) * homogenize(v))[0];
 }
 
 Vector2 Transformation::operator - (const Transformation &other) const
