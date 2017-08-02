@@ -4,15 +4,25 @@ It is supposed to help people interact with their computer in a more comfortable
 
 Although this program is the cornerstone of my diploma thesis published in July 2017 it is not complete yet, nor friendly to the end user.
 
+## dependencies
+The program requires the OpenCV 3 library.
+Build requires GNU Make.
+Note that the source code is written in the C++11 standard, and that we use the non-standard keywords `and`, `or` instead of the operators `&&`, `||`.
+
 ## installation
-When OpenCV 3.0 and all its dependencies are installed, `make fit_eyes` should build the main program.
-If you step into the `src/` directory, you can build and try several smaller targets such as `test_face`, `rig_eye` etc.
+In order to build the main program `fit_eyes`, just execute `make` in the root directory.
+
+In order to build a testing program, such as `test_face`, go to the `src/` subdirectory and specify that program as the Make target.
 
 ## usage
-The program `./fit_eyes` will try to localize a human face in the image from the camera.
+The program `fit_eyes` will try to localize a human face in the image from the camera.
 If this fails, the program throws an error message and stops.
 
-If a face is detected, the program proceeds with a calibration sequence.
+You can mark the face manually if you specify the `-i` option on the command line.
+You have to mark firstly the parent tracker over the whole face, and then two eyes by dragging two circles from the center.
+For a good tracking it is important that you mark the eyes with their correct radius.
+
+Once a face is detected, the program proceeds with a calibration sequence.
 It shows a moving dot on the screen.
 Please, watch this dot carefully until it disappears (it should be no longer than 30 seconds).
 
@@ -32,5 +42,13 @@ At compile time, you have to set `TRANSFORMATION=<model>` to one of the followin
 There are two 'children schemes' for face tracking.
 These are switched by the `CHILDREN=<scheme>` directive at compile time:
  * `markers`: Several small markers are set to track interesting facial features. Default option.
- * `grid`: The face area is seamlessly subdivided into several trackers, each responsible of its cut out cell. The code is not finished yet.
+ * `grid`: The face area is seamlessly subdivided into several trackers, each responsible of its cut out cell. Only supported for `perspective` motion model so far. The code is unfinished and unstable.
 
+After changing these build options, it is necessary to do a `make clean`.
+
+## testing programs
+
+### test_face
+Similar to the main program, this programs starts with either autodetection or interactive marking of the face.
+Then, it skips the calibration procedure and just shows the interactive face and eye tracking results.
+In this program, gaze is not estimated.
