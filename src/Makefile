@@ -24,7 +24,7 @@ test_face: ui.o bitmap.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDRE
 test_eigenface: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
 test_gaze: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
 test_grid_calibrate: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) ui.o
-test_transformation: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
+test_transformation: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) $(OBJ_CHILDREN)
 test_transformation_barycentric: bitmap.o $(OBJ_TRANSFORMATION)
 test_optimization: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
 cest_ceres: LIBS += -lceres -lglog

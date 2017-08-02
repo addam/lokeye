@@ -4,3 +4,4 @@ fit_eyes:
 
 clean:
 	make -C src clean
+	rm -f fit_eyes
