@@ -232,12 +232,20 @@ Face init_interactive(const Bitmap3 &img)
     return result;
 }
 
-void render_region(Region region, Transformation tsf, Bitmap3 &canvas)
+void render_region(Region r, Transformation tsf, Bitmap3 &canvas)
 {
-    std::array<Vector2, 4> vertices{to_vector(region.tl()), Vector2(region.x, region.y + region.height), to_vector(region.br()), Vector2(region.x + region.width, region.y)};
+    #if defined TRANSFORMATION_PERSPECTIVE_H
+    auto vertices = tsf.static_params;
+    #elif defined TRANSFORMATION_BARYCENTRIC_H
+    std::array<Vector2, 3> vertices = {Vector2{r.x, r.y}, Vector2{r.x + r.width/2, r.y + r.height}, Vector2{r.x + r.width, r.y}};
+    #else
+    std::array<Vector2, 4> vertices = {r.tl(), Vector2{r.x, r.y + r.height}, r.br(), Vector2{r.x + r.width, r.y}};
+    #endif
     std::for_each(vertices.begin(), vertices.end(), [tsf](Vector2 &v) { v = tsf(v); });
-    for (int i = 0; i < 4; i++) {
-        cv::line(canvas, to_pixel(vertices[i]), to_pixel(vertices[(i+1)%4]), cv::Scalar(0, 1.0, 1.0));
+    Vector2 prev = vertices.back();
+    for (Vector2 here : vertices) {
+        cv::line(canvas, to_pixel(prev), to_pixel(here), cv::Scalar(0, 1.0, 1.0));
+        prev = here;
     }
 }
 
