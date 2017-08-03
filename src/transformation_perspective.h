@@ -15,8 +15,8 @@ struct Transformation
     Transformation(Region region);
     Transformation(decltype(params), decltype(static_params));
     Transformation& operator = (const Transformation&);
-    Transformation operator + (Params) const;
-    Transformation& operator += (Params);
+    Transformation operator + (const Params&) const;
+    Transformation& operator += (const Params&);
     Transformation& increment(Vector2, int);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
@@ -32,5 +32,5 @@ protected:
     void update_params(Matrix33 in_params);  /// Precalculate the transformation derivatives
 };
 
-Vector2 extract_point(Transformation::Params, unsigned);
+Vector2 extract_point(const Transformation::Params&, unsigned);
 #endif

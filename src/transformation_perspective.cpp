@@ -81,7 +81,7 @@ decltype(Transformation::canonize_matrix) canonize_all_permutations(PointPack po
 
 }
 
-Vector2 extract_point(Params p, unsigned index)
+Vector2 extract_point(const Params &p, unsigned index)
 {
     assert (index < 4);
     return Vector2(p[2*index + 0], p[2*index + 1]);
@@ -134,14 +134,14 @@ Transformation& Transformation::operator = (const Transformation &other)
     return *this;
 }
 
-Transformation Transformation::operator + (Params delta) const
+Transformation Transformation::operator + (const Params &delta) const
 {
     Transformation result(*this);
     result += delta;
     return result;
 }
 
-Transformation& Transformation::operator += (Params delta)
+Transformation& Transformation::operator += (const Params &delta)
 {
     for (int i=0; i<points.size(); ++i) {
         points[i] += extract_point(delta, i);
@@ -200,7 +200,11 @@ Transformation Transformation::operator () (Transformation other) const
 
 float Transformation::scale(Vector2 v) const
 {
-    return (params(0, 0) * params(1, 1) / params(2, 2)) / (params.row(2) * homogenize(v))[0];
+    Matrix33 m(params);
+    Vector3 p = params * homogenize(v);
+    set_col(m, 2, p);
+    m *= 1./p(2);
+    return cv::determinant(m);
 }
 
 Vector2 Transformation::operator - (const Transformation &other) const

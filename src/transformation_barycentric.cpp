@@ -67,14 +67,14 @@ void Transformation::update_params()
 	params = points * static_params;
 }
 
-Transformation Transformation::operator + (Params delta) const
+Transformation Transformation::operator + (const Params &delta) const
 {
     Transformation result(*this);
     result += delta;
     return result;
 }
 
-Transformation& Transformation::operator += (Params delta)
+Transformation& Transformation::operator += (const Params &delta)
 {
 	points += delta;
 	update_params();

@@ -37,14 +37,14 @@ Transformation& Transformation::operator = (const Transformation &other)
     return *this;
 }
 
-Transformation Transformation::operator + (Params delta) const
+Transformation Transformation::operator + (const Params &delta) const
 {
     Transformation result(*this);
     result += delta;
     return result;
 }
 
-Transformation& Transformation::operator += (Params delta)
+Transformation& Transformation::operator += (const Params &delta)
 {
     params.first += extract_translation(delta);
     params.second += extract_angle(delta);

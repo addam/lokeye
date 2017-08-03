@@ -11,8 +11,8 @@ struct Transformation
     Transformation(Region region);
     Transformation(decltype(params), decltype(static_params));
     Transformation& operator = (const Transformation&);
-    Transformation operator + (Params) const;
-    Transformation& operator += (Params);
+    Transformation operator + (const Params&) const;
+    Transformation& operator += (const Params&);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
     Region operator () (Region) const;

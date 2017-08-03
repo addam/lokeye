@@ -21,28 +21,32 @@ void param_set(cv::Vec<float, N> &params, int i, float value)
 }
 
 template<int N, int M>
-float param_get(const cv::Matx<float, N, M>  &params, int i)
+float param_get(const cv::Matx<float, N, M> &params, int i)
 {
     return params(i/Params::cols, i%Params::cols);
 }
 
 template<int N>
-float param_get(const  cv::Vec<float, N> &params, int i)
+float param_get(const cv::Vec<float, N> &params, int i)
 {
     return params(i);
 }
 
-std::basic_ostream<char> &operator<<(std::basic_ostream<char> &stream, const std::array<cv::Vec<float, 2>, 4> arr)
+std::basic_ostream<char> &operator<<(std::basic_ostream<char> &stream, const std::array<cv::Vec<float, 2>, 4> &arr)
 {
     return (stream << "a = " << arr[0] << "'\nb = " << arr[1] << "'\nc = " << arr[2] << "'\nd = " << arr[3] << "'");
 }
     
+std::basic_ostream<char> &operator<<(std::basic_ostream<char> &stream, const std::pair<Vector2, Matrix22> &par)
+{
+    return (stream << "A = " << par.second << "\nt = " << par.first);
+}
 
-Params rand_params(std::minstd_rand &gen)
+Params rand_params(std::minstd_rand &gen, float scale=1)
 {
     Params result;
     for (int i=0; i<param_cn; ++i) {
-        param_set(result, i, Rng(-1, 1)(gen));
+        param_set(result, i, Rng(-scale, scale)(gen));
     }
     return result;
 }
@@ -60,7 +64,7 @@ Gradient analytic(const Transformation &tsf, Vector2 point)
     Gradient result;
     for (int i=0; i<2; ++i) {
         const Params row = tsf.d(point, i);
-        std::cout << "derivative of " << i << ":\n" << row << std::endl;
+        std::cout << "derivative of v(" << i << ") wrt. params:\n" << row << std::endl;
         for (int j=0; j<param_cn; ++j) {
             result(i, j) = param_get(row, j);
         }
@@ -85,6 +89,11 @@ Gradient numeric(const Transformation &tsf, Vector2 point, float delta)
     return result;
 }
 
+float cross(Vector2 a, Vector2 b)
+{
+    return a(0) * b(1) - b(0) * a(1);
+}
+
 int main(int argc, char** argv)
 {
     using std::cout;
@@ -97,17 +106,20 @@ int main(int argc, char** argv)
     cout << region << endl;
     Transformation tsf(region);
     Vector2 point = rand_point(gen);
-    Params r = rand_params(gen);
-    cout << "Static:" << endl << tsf.static_params << endl;
-    cout << tsf.params << endl << r << endl;
-    #if 0
-        tsf += r;
-        cout << tsf.params << endl;
-    #endif
-    cout << "Analytic:" << endl << analytic(tsf, point) << endl;
+    cout << "Identity scale = " << tsf.scale(point) << endl;
+    Params r = rand_params(gen, 1);
+    cout << "Static params:" << endl << tsf.static_params << endl;
+    cout << "params_old = " << tsf.params << endl << r << endl;
+    tsf += r;
+    cout << "params_new = " << tsf.params << endl;
+    cout << "Analytic derivative:" << endl << analytic(tsf, point) << endl;
+    cout << "Analytic scale = " << tsf.scale(point) << endl;
     float delta = 1;
     for (int i=0; i<2; ++i) {
-        cout << "Numeric, delta " << delta << ":" << endl << numeric(tsf, point, delta) << endl;
+        cout << "Numeric derivative, delta " << delta << ":" << endl << numeric(tsf, point, delta) << endl;
+        Vector2 a = tsf(Vector2(point(0) + delta, point(1))) - tsf(point);
+        Vector2 b = tsf(Vector2(point(0), point(1) + delta)) - tsf(point);
+        cout << "Numeric scale = " << cross(a, b) / pow2(delta) << endl;
         delta /= 10;
     }
     return 0;
