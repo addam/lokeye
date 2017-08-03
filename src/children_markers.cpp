@@ -6,8 +6,8 @@ Children::Children(const Bitmap3 &image, Region parent):
     ref(image)
 {
     float scale = parent.height;
-    Region upper(parent.x + 0.4*scale, parent.y + 0.25*scale, 0.2*scale, 0.2*scale);
-    Region lower(parent.x + 0.4*scale, parent.y + 0.45*scale, 0.2*scale, 0.2*scale);
+    Region upper(parent.x + 0.3*scale, parent.y + 0.25*scale, 0.4*scale, 0.2*scale);
+    Region lower(parent.x + 0.3*scale, parent.y + 0.45*scale, 0.4*scale, 0.2*scale);
     markers.emplace_back(Transformation(), lower);
     markers.emplace_back(Transformation(), upper);
 }
