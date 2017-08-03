@@ -6,9 +6,27 @@
 #include <deque>
 #include <tuple>
 #include <chrono>
+#include <thread>
+#include <mutex>
+#include <iostream>
 using cv::Point;
 using cv::Vec2f;
 using std::deque;
+using std::vector;
+
+template<typename T>
+class Safe : public T {
+    std::atomic_flag locked = ATOMIC_FLAG_INIT;
+public:
+    void lock() {
+        while (locked.test_and_set()) {
+            std::this_thread::yield();
+        }
+    }
+    void unlock() {
+        locked.clear();
+    }
+};
 
 inline Vec2f to_vector(Point p)
 {
@@ -69,6 +87,29 @@ void make_plan(deque<Point> &curve, int width, int height)
     printf("ended with %lu.\n", curve.size());
 }
 
+using Measurements = Safe<vector<Vec2f>>;
+using Lock = std::lock_guard<Measurements>;
+
+void reader_thread(Measurements &m, std::unique_ptr<Vec2f> &result)
+{
+    while (1) {
+        {
+            Lock lk(m);
+            Vec2f sum(0, 0);
+            for (Vec2f v : m) {
+                //std::cout << '(' << v[0] << ", " << v[1] << "), ";
+                sum += v;
+            }
+        }
+        std::cout << "sum = " << sum[0] << ", " << sum[1] << std::endl;
+        if (int(sum[0]) % 42 == (int(sum[1]) + 1) % 42) {
+            result.reset(new Vec2f(sum));
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
 int main()
 {
     using Clock = std::chrono::steady_clock;
@@ -89,6 +130,11 @@ int main()
     deque<Point> curve;
     static auto rng = cv::theRNG();
     auto time_prev = Clock::now();
+
+    Measurements measurements;
+    std::unique_ptr<Vec2f> result;
+    std::thread reader(reader_thread, std::ref(measurements), std::ref(result));
+
     for (int i=0; ; ++i) {
         while (curve.size() < lookahead) {
             make_plan(curve, width, height);
@@ -100,6 +146,10 @@ int main()
         }
         cv::imshow(winname, canvas);
         cv::circle(canvas, curve.front(), 51, white, -1);
+        {
+            Lock lk(measurements);
+            measurements.push_back(to_vector(curve.front()));
+        }
         if (char(cv::waitKey(20)) == 27) {
             break;
         }
