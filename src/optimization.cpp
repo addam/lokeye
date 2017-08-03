@@ -4,6 +4,7 @@
 #include "homography.h"
 #include <iostream>
 #include <random>
+#include <mutex>
 #include <opencv2/objdetect.hpp>
 
 template<int size>
@@ -43,19 +44,17 @@ float combinations_ratio(int count_total, int count_good)
     return result;
 }
 
-Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
+Gaze::Gaze(const Matrix35 &fn) : fn(fn)
 {
-    if (false) {
-        vector<Measurement> subpairs = random_sample<8>(pairs);//(pairs.begin(), pairs.begin() + 7);
-        fn = homography<3, 5>(subpairs);
-        out_support = support(fn, pairs, precision).size();
-        printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
-        return;
-    }
-    const int necessary_support = std::min(out_support, int(pairs.size()));
+}
+
+Gaze Gaze::ransac(const vector<Measurement> &pairs, int &out_support, float precision)
+{
+    const int necessary_support = out_support;
     out_support = 0;
     const int min_sample = 7;
     float iterations = 1 + combinations_ratio<min_sample>(pairs.size(), necessary_support);
+    Matrix35 result;
     for (int i=0; i < iterations; i++) {
         vector<Measurement> sample = random_sample<min_sample>(pairs);
         size_t prev_sample_size;
@@ -67,13 +66,35 @@ Gaze::Gaze(const vector<Measurement> &pairs, int &out_support, float precision)
         } while (sample.size() > prev_sample_size);
         if (sample.size() > out_support) {
             out_support = sample.size();
-            fn = h;
+            result = h;
             if (sample.size() >= necessary_support) {
                 iterations = combinations_ratio<min_sample>(pairs.size(), sample.size());
             }
         }
     }
-    printf("support = %i / %lu, %f %f %f %f %f; %f %f %f %f %f; %f %f %f %f %f\n", out_support, pairs.size(), fn(0,0), fn(0,1), fn(0,2), fn(0,3), fn(0,4), fn(1,0), fn(1,1), fn(1,2), fn(0,3), fn(0,4), fn(2,0), fn(2,1), fn(2,2), fn(0,3), fn(0,4));
+    return Gaze(result);
+}
+
+Gaze Gaze::guess(Safe<vector<Measurement>> &pairs, int &out_support, float precision)
+{
+    using Lock = std::lock_guard<Safe<vector<Measurement>>>;    
+    const int necessary_support = out_support;
+    out_support = 0;
+    vector<Measurement> sample;
+    {
+        Lock lk(pairs);
+        sample = random_sample<7>(pairs);
+    }
+    Matrix35 h = homography<3, 5>(sample);
+    do {
+        out_support = sample.size();
+        h = homography<3, 5>(sample);
+        {
+            Lock lk(pairs);
+            sample = support(h, pairs, precision);
+        }
+    } while (sample.size() > out_support);
+    return Gaze(h);
 }
 
 Vector2 Gaze::operator () (Vector4 v) const
@@ -301,7 +322,7 @@ Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterat
 		int support = necessary_support;
 		const float precision = 150;
 		std::cout << "starting to solve..." << std::endl;
-		Gaze result(measurements, support, precision);
+		Gaze result = Gaze::ransac(measurements, support, precision);
 		for (Measurement pair : measurements) {
 			std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << ((cv::norm(result(pair.first) - pair.second) < precision) ? " INLIER" : " out") << std::endl;
 		}

@@ -9,10 +9,13 @@
 
 using Measurement = std::pair<Vector4, Vector2>;
 
-struct Gaze
+class Gaze
 {
     Matrix35 fn;
-    Gaze(const vector<Measurement>&, int &out_support, float precision=50);
+    Gaze(const Matrix35&);
+public:
+    static Gaze ransac(const vector<Measurement>&, int &out_support, float precision=50);
+    static Gaze guess(Safe<vector<Measurement>>&, int &out_support, float precision=50);
     Vector2 operator () (Vector4) const;
 };
 

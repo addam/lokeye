@@ -8,6 +8,8 @@
 #include <vector>
 #include <chrono>
 #include <string>
+#include <thread>
+#include <mutex>
 #include "vector_math.h"
 
 using std::vector;
@@ -24,6 +26,21 @@ struct Circle
 {
     Vector2 center;
     float radius;
+};
+
+/// Container that allows thread-safe access to a data structure
+template<typename T>
+class Safe : public T {
+    std::atomic_flag locked = ATOMIC_FLAG_INIT;
+public:
+    void lock() {
+        while (locked.test_and_set()) {
+            std::this_thread::yield();
+        }
+    }
+    void unlock() {
+        locked.clear();
+    }
 };
 
 inline Circle operator* (float coef, const Circle &c)

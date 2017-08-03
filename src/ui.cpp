@@ -9,6 +9,9 @@
 
 namespace {
 
+using Measurements = Safe<vector<Measurement>>;
+using Lock = std::lock_guard<Measurements>;
+
 class Initialization
 {
     using Drag = std::pair<Pixel, Pixel>;
@@ -32,7 +35,6 @@ class Calibration
     using Clock = std::chrono::steady_clock;
     const char *winname;
     const cv::Scalar white = cv::Scalar(255, 255, 255);
-    vector<Measurement> measurements;
     const int width = 1650, height = 1000;
     const int speed = 800;
     const int lookahead = 500;
@@ -52,7 +54,6 @@ class Calibration
      */
     static void limit_radius(float &r, float d, float vx, float vy);
 public:
-    bool running = false;
     Calibration(const char*);
     ~Calibration();
     bool render();
@@ -90,7 +91,7 @@ void Initialization::render() const
 Circle Initialization::eye(int index) const
 {
     assert (not is_rectangle.at(index));
-    return {to_vector(record[index].first), cv::norm(record[index].second - record[index].first)};
+    return {to_vector(record[index].first), float(cv::norm(record[index].second - record[index].first))};
 }
 
 Region Initialization::region(int index) const
@@ -189,7 +190,7 @@ bool Calibration::render()
 {
     auto time_now = Clock::now();
     float elapsed_time = std::chrono::duration_cast<std::chrono::duration<float>>(time_now - time_prev).count();
-    size_t skipped_pixels = running ? 1 + speed * elapsed_time : 0;
+    size_t skipped_pixels = 1 + speed * elapsed_time;
     while (curve.size() < lookahead + skipped_pixels) {
         extend();
     }
@@ -208,7 +209,6 @@ bool Calibration::render()
     if (char(cv::waitKey(20)) == 27) {
         return false;
     }
-    running = true;
     time_prev = time_now;
     return true;
 }
@@ -260,30 +260,45 @@ void Face::render(const Bitmap3 &image, const char *winname) const
     cv::imshow(winname, result);
 }
 
-Gaze calibrate_interactive(Face &face, VideoCapture &cap, Pixel window_size)
+void gaze_thread(Measurements &measurements, std::unique_ptr<Gaze> &result)
 {
     const int necessary_support = 20;
+    const float precision = 150;
+    while (measurements.size() < necessary_support) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::cout << "starting the solve thread" << std::endl;
+    while (1) {
+        int support = necessary_support;
+        Gaze candidate = Gaze::guess(measurements, support, precision);
+        if (support >= necessary_support) {
+            result.reset(new Gaze(candidate));
+            break;
+        }
+    }
+    const Gaze &gaze = *result;
+    for (auto pair : measurements) {
+        std::cout << pair.first << " -> " << gaze(pair.first) << " vs. " << pair.second << ((cv::norm(gaze(pair.first) - pair.second) < precision) ? " INLIER" : " out") << std::endl;
+    }
+    return;
+}
+
+Gaze calibrate_interactive(Face &face, VideoCapture &cap, Pixel window_size)
+{
     Calibration session("calibration");
     Bitmap3 image;
-    std::vector<Measurement> measurements;
-    for (int i=0; ; ++i) {
+    Measurements measurements;
+    std::unique_ptr<Gaze> result;
+    std::thread reader(gaze_thread, std::ref(measurements), std::ref(result));
+    for (int i=0; not result; ++i) {
         session.render();
         image.read(cap, true);
         face.refit(image);
-        measurements.emplace_back(std::make_pair(face(), session()));
-        bool do_recalc_gaze = measurements.size() % 9 == 0 and measurements.size() >= necessary_support;
-        if (do_recalc_gaze) {
-            session.running = false;
-            int support = necessary_support;
-            const float precision = 150;
-            std::cout << "starting to solve..." << std::endl;
-            Gaze result(measurements, support, precision);
-            for (auto pair : measurements) {
-                std::cout << pair.first << " -> " << result(pair.first) << " vs. " << pair.second << ((cv::norm(result(pair.first) - pair.second) < precision) ? " INLIER" : " out") << std::endl;
-            }
-            if (support >= necessary_support) {
-                return result;
-            }
+        {
+            Lock lk(measurements);
+            measurements.emplace_back(std::make_pair(face(), session()));
         }
     }
+    reader.join();
+    return *result;
 }
