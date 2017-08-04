@@ -9,9 +9,8 @@
  * This class manages the coordinates properly, even when scaling and calculating derivatives.
  */
 template<typename T>
-class Bitmap : public cv::Mat_<T>
+struct Bitmap : public cv::Mat_<T>
 {
-protected:
     using DataType = cv::Mat_<T>;
     
     /** Position of top left corner in world reference frame
@@ -21,7 +20,7 @@ protected:
     /** Size of a pixel in world reference frame
      */
     float scale;
-public:
+
     Vector2 to_local(Vector2) const;
     Pixel to_clamped_local(Vector2) const;
     Vector2 to_world(Pixel) const;

@@ -220,10 +220,6 @@ void refit_transformation(Transformation &tsf, const Bitmap3 &img, const Bitmap3
     for (const auto &pair : pyramid) {
         Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
         float prev_energy = evaluate(tsf, pair.first, pair.second);
-        if (prev_energy <= 0) {
-            printf("prev_energy = %g, stop.\n", prev_energy);
-            continue;
-        }
         for (int iteration=0; iteration < iteration_count; ++iteration) {
             Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
             float step_mag = 2 * step_length(delta_tsf, tsf);

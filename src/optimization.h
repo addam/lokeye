@@ -50,7 +50,7 @@ Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 7
 Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
 
 float line_search(Transformation::Params, float &prev_energy, float max_length, const Transformation&, const Bitmap3&, const Bitmap3&);
-float step_length(Transformation::Params, Region, const Transformation&);
+float step_length(Transformation::Params, const Transformation&);
 float evaluate(const Transformation&, const Bitmap3&, const Bitmap3&);
 Transformation::Params update_step(const Transformation&, const Bitmap3&, const Bitmap3&, const Bitmap3&, int direction);
 #endif
