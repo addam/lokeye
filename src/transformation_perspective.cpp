@@ -57,10 +57,9 @@ Params pack_vectors(const array<array<Vector2, 2>, 4> &vec, int direction)
     return result;
 }
 
-Matrix23 projection_derivative(Vector2 projected_v, float w)
+Vector2 projection_derivative(Vector2 projected_v, float w, Vector3 rhs_factor)
 {
-    return (1./w) * Matrix23{1, 0, -projected_v[0],
-        0, 1, -projected_v[1]};
+    return Vector2(rhs_factor[0] - projected_v[0]*rhs_factor[2], rhs_factor[1] - projected_v[1]*rhs_factor[2]) / w;
 }
 
 template<typename T>
@@ -174,7 +173,7 @@ Params Transformation::d(Vector2 v, int direction) const
 	    for (int i=0; i<4; ++i) {
 	        Vector3 canonized_v = canonize_matrix[i] * homogenize(v);
 	        for (int j=0; j<2; ++j) {
-		        result_vectors[i][j] = projection_derivative(projected_v, weight_vector[i].dot(canonized_v)) * derivative_matrix[i][j] * canonized_v;
+		        result_vectors[i][j] = projection_derivative(projected_v, weight_vector[i].dot(canonized_v), derivative_matrix[i][j] * canonized_v);
 			}
 	    }
 	}
