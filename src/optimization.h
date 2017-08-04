@@ -49,7 +49,7 @@ Face init_static(const Bitmap3&, const string &face_xml="/usr/local/share/OpenCV
 Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
 
-float line_search(Transformation::Params, float &max_length, float &prev_energy, const Transformation&, const Bitmap3&, const Bitmap3&);
+float line_search(Transformation::Params, float &prev_energy, float max_length, const Transformation&, const Bitmap3&, const Bitmap3&);
 float step_length(Transformation::Params, Region, const Transformation&);
 float evaluate(const Transformation&, const Bitmap3&, const Bitmap3&);
 Transformation::Params update_step(const Transformation&, const Bitmap3&, const Bitmap3&, const Bitmap3&, int direction);

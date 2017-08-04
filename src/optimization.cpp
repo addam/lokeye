@@ -133,17 +133,23 @@ float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref
         Vector2 v = tsf(reference.to_world(p));
         Vector3 diff = img(v) - reference(p);
         result += diff.dot(diff);
+        if (not (std::isfinite(result) and result >= 0)) {
+            std::cout << "img@" << v << " = " << img(v) << std::endl;
+            std::cout << "ref@" << p << " = " << reference(p) << std::endl;
+            std::cout << diff << "**2 = " << diff.dot(diff) << std::endl;
+            assert(false);
+        }
+        assert(std::isfinite(result) and result >= 0);
     }
     return 0.5 * result;
 }
 
 /** Maximum difference caused by adding 'step' to 'tsf', in pixels
  * @param step Differential update of the transformation
- * @param r Region of interest (search domain for the maximum)
  */
 float step_length(Transformation::Params step, const Transformation &tsf)
 {
-    float result = 1e-5;
+    float result = 0;
     for (Vector2 v : tsf.vertices()) {
         for (int i=0; i<2; i++) {
             result = std::max(result, std::abs(tsf.d(v, i).dot(step)));
@@ -178,64 +184,59 @@ float quadratic_minimum(float f0, float f1, float df0)
     }
 }
 
-float line_search(Transformation::Params delta_tsf, float &max_length, float &prev_energy, const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref)
+float line_search(Transformation::Params delta_tsf, float &prev_energy, float length, const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref)
 {
+    const int iteration_count = 2;
     const float epsilon = 1e-5;
-    float length = max_length;
     float current_energy = evaluate(tsf + length * delta_tsf, img, ref);
-    while (1) {
+    for (int i=0; i<iteration_count; ++i) {
         float slope = -delta_tsf.dot(delta_tsf) * length;
         if (slope > 0) {
 			printf("prev: %g, current: %g, slope: %g, fail.\n", prev_energy, current_energy, slope);
 			return 0;
 		}
         float coef = quadratic_minimum(prev_energy, current_energy, slope);
-        float next_energy = evaluate(tsf + coef * length * delta_tsf, img, ref);
-        if (next_energy >= current_energy or coef == 1) {
-            max_length = 2 * length;
+        float next_energy = evaluate(tsf + (coef * length) * delta_tsf, img, ref);
+        if (next_energy / current_energy > 1 - epsilon or coef == 1) {
             prev_energy = current_energy;
             return length;
-        } else if (next_energy / current_energy > 1 - epsilon) {
-            return 0;
         } else {
             length *= coef;
             current_energy = next_energy;
         }
     }
+    return length;
 }
 
 void refit_transformation(Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref, int min_size)
 {
     const int iteration_count = 2;
     vector<std::pair<Bitmap3, Bitmap3>> pyramid = {{img, ref}};
-    if (std::min({pyramid.back().first.rows, pyramid.back().first.cols, pyramid.back().second.rows, pyramid.back().second.cols}) == 0) {
-        return;
-    }
-    while (std::min({pyramid.back().first.rows, pyramid.back().first.cols, pyramid.back().second.rows, pyramid.back().second.cols}) >= 2 * min_size) {
+    for (float size=radius(tsf.region); size > min_size; size /= 2) {
         auto &pair = pyramid.back();
         pyramid.emplace_back(pair.first.downscale(), pair.second.downscale());
     }
-    while (not pyramid.empty()) {
-        auto &pair = pyramid.back();
+    std::reverse(pyramid.begin(), pyramid.end());
+    for (const auto &pair : pyramid) {
         Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
         float prev_energy = evaluate(tsf, pair.first, pair.second);
-        //printf("evaluate (%ix%i) vs. (%ix%i) yields %g\n", pair.first.cols, pair.first.rows, pair.second.cols, pair.second.rows, prev_energy);
-        if (prev_energy > 0) {
-	        float max_length;
-	        for (int iteration=0; iteration < iteration_count; ++iteration) {
-	            Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
-	            if (iteration == 0) {
-	                max_length = (1 << pyramid.size()) / step_length(delta_tsf, tsf);
-	            }
-	            float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
-	            if (length > 0) {
-	                tsf += delta_tsf * length;
-	            } else {
-	                break;
-	            }
-	        }
-		}
-        pyramid.pop_back();
+        if (prev_energy <= 0) {
+            printf("prev_energy = %g, stop.\n", prev_energy);
+            continue;
+        }
+        for (int iteration=0; iteration < iteration_count; ++iteration) {
+            Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
+            float step_mag = 2 * step_length(delta_tsf, tsf);
+            if (step_mag < 1e-10) {
+                break;
+            }
+            float length = line_search(delta_tsf, prev_energy, pair.first.scale / step_mag, tsf, pair.first, pair.second);
+            if (length > 0) {
+                tsf += length * delta_tsf;
+            } else {
+                break;
+            }
+        }
     }
 }
 

@@ -15,6 +15,7 @@ Children::Children(const Bitmap3 &image, Region parent):
 void Children::refit(const Bitmap3 &img, const Transformation &parent_tsf)
 {
     for (Transformation &tsf : children) {
+        tsf = parent_tsf;
         refit_transformation(tsf, img, ref);
     }
 }

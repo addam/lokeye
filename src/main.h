@@ -65,6 +65,16 @@ inline Vector2 center(Triangle t)
     return (t[0] + t[1] + t[2]) / 3;
 }
 
+inline float radius(Region r)
+{
+    return std::min(r.width, r.height);
+}
+
+inline float radius(Triangle t)
+{
+    return std::min({cv::norm(t[1] - t[0]), cv::norm(t[2] - t[1]), cv::norm(t[0] - t[2])});
+}
+
 inline Pixel to_pixel(Vector2 v)
 {
     return Pixel{int(v[0]), int(v[1])};
