@@ -61,8 +61,8 @@ Vector2 Transformation::operator () (Vector2 v) const
 
 Params Transformation::d(Vector2 v, int direction) const
 {
-    float s, c, coef;
-    sincos(s, c, coef);
+    float s, c;
+    float coef = sincos(s, c);
     v -= static_params.first;
     return (direction == 0) ? Params{1, 0, coef * (-v[0] * s - v[1] * c)} : Params{0, 1, coef * (v[0] * c - v[1] * s)};
 }
@@ -104,16 +104,11 @@ Vector2 Transformation::inverse(Vector2 v) const
     return inverse()(v);
 }
 
-void Transformation::sincos(float &s, float &c) const
+float Transformation::sincos(float &s, float &c) const
 {
-    float dummy;
-    sincos(s, c, dummy);
-}
-
-void Transformation::sincos(float &s, float &c, float &coef) const
-{
-    coef = 3.14f / static_params.second;
+    float coef = M_PI / static_params.second;
     float angle = coef * params.second;
     s = sin(angle);
     c = cos(angle);
+    return coef;
 }

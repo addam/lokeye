@@ -116,7 +116,7 @@ Transformation::Params update_step(const Transformation &tsf, const Bitmap3 &img
     Transformation::Params result;
     // formula : delta_tsf = -sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
     Transformation tsf_inv = tsf.inverse();
-    for (Pixel p : grad) {
+    for (Pixel p : sampling(grad)) {
         Vector2 v = grad.to_world(p), refv = tsf_inv(v);
         if (ref.contains(refv)) {
             Vector3 diff = img(v) - ref(refv);
@@ -130,7 +130,7 @@ float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref
 {
     float result = 0;
     // formula : energy = 1/2 * sum_pixel (img o tsf - ref)^2
-    for (Pixel p : reference) {
+    for (Pixel p : sampling(reference)) {
         Vector2 v = tsf(reference.to_world(p));
         Vector3 diff = img(v) - reference(p);
         result += diff.dot(diff);

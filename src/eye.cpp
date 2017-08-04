@@ -181,7 +181,7 @@ void HoughEye::refit(Circle &c, const Bitmap3 &img) const
         cv::cvtColor(img, hsv, cv::COLOR_BGR2HSV);
     }
     Bitmap1 dx = gray.d(0), dy = gray.d(1);
-    for (Pixel p : dx) {
+    for (Pixel p : sampling(dx)) {
         Vector2 v = dx.to_world(p);
         if (use_hsv_mask and hsv_bounded(hsv(v))) {
             continue;
@@ -190,7 +190,7 @@ void HoughEye::refit(Circle &c, const Bitmap3 &img) const
         float size = cv::norm(gradient);
         cast_vote(votes, v - gradient * c.radius / size, size);
     }
-    for (Pixel p : dy) {
+    for (Pixel p : sampling(dy)) {
         Vector2 v = dy.to_world(p);
         if (use_hsv_mask and hsv_bounded(hsv(v))) {
             continue;
@@ -227,7 +227,7 @@ float LimbusEye::dp(Circle c, int direction, const Bitmap1 &derivative) const
 {
     float result = 0;
     float sum_weight = 0;
-    for (Pixel p : derivative) {
+    for (Pixel p : sampling(derivative)) {
         Vector2 offcenter = derivative.to_world(p) - c.center;
         float w = 1 - std::abs(cv::norm(offcenter) - c.radius);
         if (w > 0) {
@@ -321,7 +321,7 @@ float RadialEye::grad_func(Vector2 grad, Vector2 direction)
 vector<Vector3> RadialEye::radial_mean(Circle c, const Bitmap3 &img) const
 {
     vector<vector<Vector3>> histogram(c.radius + 1);
-    for (Pixel p : img) {
+    for (Pixel p : sampling(img)) {
         Vector2 diff = img.to_world(p) - c.center;
         int r = cv::norm(diff);
         if (r < c.radius) {
@@ -377,7 +377,7 @@ float RadialEye::eval(Circle c, const Bitmap3 &img, const Bitmap1 &dx, const Bit
 	}
 	std::vector<float> iris_score(angular_bins, 0);
 	std::vector<float> iris_weight(angular_bins, 0);
-	for (Pixel p : img) {
+	for (Pixel p : sampling(img)) {
         Vector2 diff = img.to_world(p) - c.center;
         int r = cv::norm(diff);
         if (r <= c.radius and r != 0) {
@@ -405,7 +405,7 @@ void RadialEye::refit(Circle &c, const Bitmap3 &img) const
     }
     const Bitmap1 dx = gray.d(0), dy = gray.d(1);
 	Bitmap1 score = gray.crop(to_region(c));
-    for (Pixel p : score) {
+    for (Pixel p : sampling(score)) {
         Circle candidate{score.to_world(p), c.radius};
         Bitmap3 cropout = img.crop(to_region(candidate));
         score(p) = eval(candidate, cropout, dx, dy);

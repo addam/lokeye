@@ -28,6 +28,8 @@ struct Circle
     float radius;
 };
 
+using Triangle = std::array<Vector2, 3>;
+
 /// Container that allows thread-safe access to a data structure
 template<typename T>
 class Safe : public T {

@@ -21,8 +21,8 @@ struct Transformation
     Vector2 inverse(Vector2) const;
     Params d(Vector2, int direction) const;
 protected:
-    void sincos(float &sin, float &cos) const;
-    void sincos(float &sin, float &cos, float &coef) const;
+    /// Calculate sin and cos, and return an internal scale coefficient
+    float sincos(float &sin, float &cos) const;
 };
 
 #endif

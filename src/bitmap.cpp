@@ -7,6 +7,13 @@ inline Vector2 Bitmap<T>::to_local(Vector2 v) const
 }
 
 template<typename T>
+inline Pixel Bitmap<T>::to_clamped_local(Vector2 v) const
+{
+    v = to_local(v);
+    return Pixel(clamp(v[0], 0, DataType::cols - 1), clamp(v[1], 0, DataType::rows - 1));
+}
+
+template<typename T>
 inline Vector2 Bitmap<T>::to_world(Pixel p) const
 {
     return to_vector(p) * scale + offset;
@@ -143,7 +150,7 @@ Bitmap<T> Bitmap<T>::d(int direction, Rect rect) const
     const Bitmap<T> &self = *this;
     Bitmap<T> result(rect.height, rect.width, region_offset, scale);
     const Pixel delta{direction == 0, direction == 1};
-    for (Pixel p : result) {
+    for (Pixel p : sampling(result)) {
         result(p) = self(p + rect.tl() + delta) - self(p + rect.tl());
     }
     return result;
@@ -163,7 +170,7 @@ Bitmap<T> Bitmap<T>::downscale() const
     result.scale = 2 * scale;
     result.offset += Vector2(scale, scale);
     result = 0 * T();
-    for (Pixel s : (*this)) {
+    for (Pixel s : sampling(*this)) {
         Pixel d(s.x / 2, s.y / 2);
         if (d.y < result.rows and d.x < result.cols) {
             result(d) += (*this)(s);
@@ -178,7 +185,7 @@ Bitmap<float> Bitmap<Vector3>::grayscale(Rect rect) const
     init_rect(rect, *this);
     Bitmap1 result(rect, scale);
     const Vector3 coef = {0.114, 0.587, 0.299};
-    for (Pixel p : result) {
+    for (Pixel p : sampling(result)) {
         const Vector3 val = (*this)(p + rect.tl());
         result(p) = val.dot(coef);
     }
