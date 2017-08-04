@@ -2,19 +2,23 @@
 
 struct Transformation
 {
-    using Params = VectorN;
+    using Params = MatrixMN;
+    
+    /// Region of interest
+    Region region;
+    
     const StaticParamsType static_params;
     InternalParamsType params;
     
     Transformation();
     
-    /** Initialization with known area of interest
+    /** Initialize an identity transformation
      */
     Transformation(Region region);
     
     /** Copy constructor
      */
-    Transformation(decltype(params), decltype(static_params));
+    Transformation(Region, decltype(params), decltype(static_params));
     
     /** Update params so as to mimic another transformation
      */
@@ -25,7 +29,12 @@ struct Transformation
     Transformation operator + (Params) const;
     Transformation& operator += (Params);
 
-	/** Transform from reference to view space
+    /** Modify a vertex of a cage-based transformation
+     * (only available in barycentric and perspective)
+     */
+    Transformation& increment(Vector2, int);
+    
+    /** Transform from reference to view space
 	 */
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
@@ -48,4 +57,8 @@ struct Transformation
      * @param direction 0 for x, 1 for y
      */
     Params d(Vector2, int direction) const;
+    
+    /** Return the extremal points of the region
+     */
+    std::array<Vector2, N> vertices() const;
 };

@@ -14,18 +14,21 @@ inline Matrix22 extract_matrix(Params p)
 }
 
 Transformation::Transformation():
+    region(0, 0, 1, 1),
     static_params(Vector2(0, 0), 1),
     params(std::make_pair(Vector2(0, 0), Matrix22(1, 0, 0, 1)))
 {
 }
 
 Transformation::Transformation(Region region):
-    static_params((region.tl() + region.br()) / 2, 1. / cv::norm(region.br() - region.tl())),
+    region(region),
+    static_params(center(region), 1. / cv::norm(region.br() - region.tl())),
     params(static_params.first, (1. / static_params.second) * Matrix22::eye())
 {
 }
 
-Transformation::Transformation(decltype(params) params, decltype(static_params) static_params):
+Transformation::Transformation(Region region, decltype(params) params, decltype(static_params) static_params):
+    region(region),
     static_params(static_params),
     params(params)
 {
@@ -92,12 +95,19 @@ Vector2 Transformation::operator - (const Transformation &other) const
 
 Transformation Transformation::inverse() const
 {
+    Region tsf_region = (*this)(region);
     decltype(static_params) inverse_static_params(params.first, static_params.second);
     decltype(params) inverse_params(Vector2(static_params.first(0), static_params.first(1)), pow2(1. / static_params.second) * params.second.inv());
-    return Transformation(inverse_params, inverse_static_params);
+    return Transformation(tsf_region, inverse_params, inverse_static_params);
 }
 
 Vector2 Transformation::inverse(Vector2 v) const
 {
     return inverse()(v);
+}
+
+std::array<Vector2, 4> Transformation::vertices() const
+{
+    const Region &r = region;
+    return {r.tl(), Vector2{r.x, r.y + r.height}, r.br(), Vector2{r.x + r.width, r.y}};
 }

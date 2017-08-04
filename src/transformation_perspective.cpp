@@ -69,7 +69,7 @@ void cycle(T &seq)
     std::rotate(seq.begin(), seq.begin() + 1, seq.end());
 }
 
-decltype(Transformation::canonize_matrix) canonize_all_permutations(PointPack points)
+array<Matrix33, 4> canonize_all_permutations(PointPack points)
 {
     array<Matrix33, 4> result{};
     for (int i=0; i<4; ++i) {
@@ -88,6 +88,7 @@ Vector2 extract_point(const Params &p, unsigned index)
 }
 
 Transformation::Transformation():
+    region(0, 0, 1, 1),
     static_params{Vector2{0, 0}, Vector2{0, 1}, Vector2{1, 1}, Vector2{1, 0}},
     canonize_matrix(canonize_all_permutations(static_params))
 {
@@ -96,6 +97,7 @@ Transformation::Transformation():
 }
 
 Transformation::Transformation(Region region):
+    region(region),
     static_params(extract_points(region)),
     points(static_params),
     canonize_matrix(canonize_all_permutations(static_params))
@@ -115,7 +117,8 @@ void Transformation::update_params(decltype(params) in_params)
     }
 }
 
-Transformation::Transformation(decltype(params) in_params, decltype(static_params) static_params):
+Transformation::Transformation(Region region, decltype(params) in_params, decltype(static_params) static_params):
+    region(region),
     static_params(static_params),
     canonize_matrix(canonize_all_permutations(static_params))
 {
@@ -195,7 +198,7 @@ Region Transformation::operator () (Region region) const
 
 Transformation Transformation::operator () (Transformation other) const
 {
-    return Transformation(params * other.params, static_params);
+    return Transformation(other.region, params * other.params, static_params);
 }
 
 float Transformation::scale(Vector2 v) const
@@ -218,10 +221,16 @@ Vector2 Transformation::operator - (const Transformation &other) const
 
 Transformation Transformation::inverse() const
 {
-    return Transformation(params.inv(), static_params);
+    Region tsf_region = (*this)(region);
+    return Transformation(tsf_region, params.inv(), static_params);
 }
 
 Vector2 Transformation::inverse(Vector2 v) const
 {
     return inverse()(v);
+}
+
+std::array<Vector2, 4> Transformation::vertices() const
+{
+    return static_params;
 }

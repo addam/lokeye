@@ -9,10 +9,8 @@ struct Children
     Children(const Bitmap3&, Region parent);
     void refit(const Bitmap3&, const Transformation&);
     Vector2 operator() (const Transformation&) const;
-    void render(Bitmap3&) const;
+    vector<Transformation> children;
 protected:
-    using Marker = std::pair<Transformation, Region>;
     Bitmap3 ref;
-    vector<Marker> markers;
 };
 #endif

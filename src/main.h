@@ -50,6 +50,21 @@ inline Circle operator* (float coef, const Circle &c)
     return {c.center, coef * c.radius};
 }
 
+inline Vector2 center(Region region)
+{
+    return (region.tl() + region.br()) / 2;
+}
+
+inline Pixel center(Rect rect)
+{
+    return (rect.tl() + rect.br()) / 2;
+}
+
+inline Vector2 center(Triangle t)
+{
+    return (t[0] + t[1] + t[2]) / 3;
+}
+
 inline Pixel to_pixel(Vector2 v)
 {
     return Pixel{int(v[0]), int(v[1])};

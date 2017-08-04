@@ -3,10 +3,18 @@
 
 using Params = Transformation::Params;
 
-inline Params triangle(Region region)
+inline Triangle triangle(Region r)
 {
-	return Matrix23(region.x, region.x + region.width/2, region.x + region.width,
-		region.y, region.y + region.height, region.y);
+    return {Vector2{r.x, r.y}, Vector2{r.x + r.width/2, r.y + r.height}, Vector2{r.x + r.width, r.y}};
+}
+
+inline Params to_matrix(Triangle t)
+{
+	Matrix23 result;
+    for (int j=0; j<t.size(); ++j) {
+        set_col(result, j, t[j]);
+    }
+    return result;
 }
 
 inline Matrix33 homogenize(const Matrix23 &mat)
@@ -42,14 +50,16 @@ Transformation::Transformation()
 {
 }
 
-Transformation::Transformation(Region region):
-	points(triangle(region)),
+Transformation::Transformation(Region in_region):
+    region(triangle(in_region)),
+	points(to_matrix(region)),
 	static_params(homogenize(points).inv())
 {
 	update_params();
 }
 
-Transformation::Transformation(decltype(params) params, decltype(static_params) static_params):
+Transformation::Transformation(Triangle region, decltype(params) params, decltype(static_params) static_params):
+    region(region),
     static_params(static_params),
     params(params)
 {
@@ -96,10 +106,10 @@ Params Transformation::d(Vector2 v, int direction) const
 	return result;
 }
 
-Region Transformation::operator () (Region region) const
+Region Transformation::operator () (Region r) const
 {
     const Transformation &self = *this;
-    Vector2 tl = region.tl(), br = region.br(), bl = {tl(0), br(1)}, tr = {br(0), tl(1)};
+    Vector2 tl = r.tl(), br = r.br(), bl = {tl(0), br(1)}, tr = {br(0), tl(1)};
     Vector2 points[] = {self(tl), self(tr), self(bl), self(br)};
     Vector2 new_tl = points[0], new_br = points[0];
     for (Vector2 v : points) {
@@ -109,6 +119,13 @@ Region Transformation::operator () (Region region) const
         }
     }
     return {new_tl, new_br};
+}
+
+Triangle Transformation::operator () (Triangle r) const
+{
+    Triangle result;
+    std::transform(r.begin(), r.end(), result.begin(), *this);
+    return result;
 }
 
 float Transformation::scale(Vector2) const
@@ -124,6 +141,12 @@ Vector2 Transformation::operator - (const Transformation &other) const
 
 Transformation Transformation::inverse() const
 {
+    Triangle tsf_region = (*this)(region);
 	Matrix22 invmat = params.get_minor<2, 2>(0, 0).inv();
-	return Transformation(hmerge(invmat, -invmat * params.get_minor<2, 1>(0, 2)), homogenize(points).inv());
+	return Transformation(tsf_region, hmerge(invmat, -invmat * params.get_minor<2, 1>(0, 2)), homogenize(points).inv());
+}
+
+Triangle Transformation::vertices() const
+{
+    return region;
 }

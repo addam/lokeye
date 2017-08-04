@@ -232,19 +232,13 @@ Face init_interactive(const Bitmap3 &img)
     return result;
 }
 
-void render_region(Region r, Transformation tsf, Bitmap3 &canvas)
+void render_region(const Transformation &tsf, Bitmap3 &canvas, float yellow=1)
 {
-    #if defined TRANSFORMATION_PERSPECTIVE_H
-    auto vertices = tsf.static_params;
-    #elif defined TRANSFORMATION_BARYCENTRIC_H
-    std::array<Vector2, 3> vertices = {Vector2{r.x, r.y}, Vector2{r.x + r.width/2, r.y + r.height}, Vector2{r.x + r.width, r.y}};
-    #else
-    std::array<Vector2, 4> vertices = {r.tl(), Vector2{r.x, r.y + r.height}, r.br(), Vector2{r.x + r.width, r.y}};
-    #endif
+    auto vertices = tsf.vertices();
     std::for_each(vertices.begin(), vertices.end(), [tsf](Vector2 &v) { v = tsf(v); });
     Vector2 prev = vertices.back();
     for (Vector2 here : vertices) {
-        cv::line(canvas, to_pixel(prev), to_pixel(here), cv::Scalar(0, 1.0, 1.0));
+        cv::line(canvas, to_pixel(prev), to_pixel(here), cv::Scalar(0, yellow, 1.0));
         prev = here;
     }
 }
@@ -252,8 +246,10 @@ void render_region(Region r, Transformation tsf, Bitmap3 &canvas)
 void Face::render(const Bitmap3 &image, const char *winname) const
 {
     Bitmap3 result = image.clone();
-    render_region(main_region, main_tsf, result);
-    children.render(result);
+    render_region(main_tsf, result);
+    for (const Transformation &tsf : children.children) {
+        render_region(tsf, result, 0.7);
+    }
     for (const Circle &eye : fitted_eyes) {
         Circle transformed = {main_tsf(eye.center), main_tsf.scale(eye.center) * eye.radius};
         if (result.contains(transformed.center) and transformed.radius > 0) {

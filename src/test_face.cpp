@@ -27,6 +27,11 @@ void print(const Matrix33 &params)
     std::cout << "Main transformation: " << params << std::endl;
 }
 
+std::basic_ostream<char> &operator<<(std::basic_ostream<char> &stream, const Triangle &t)
+{
+    return (stream << "[a = " << t[0] << ", b = " << t[1] << ", c = " << t[2] << "]");
+}
+    
 void track_interactive(VideoCapture &cam, bool is_interactive, bool is_verbose)
 {
     Bitmap3 image;
@@ -48,7 +53,7 @@ void track_interactive(VideoCapture &cam, bool is_interactive, bool is_verbose)
         state.eye_locator.reset(new BitmapEye("../data/iris.png", 85 / 100.f));
     }
     
-    std::cout << state.main_region << std::endl;
+    std::cout << state.main_tsf.region << std::endl;
     TimePoint time_start = std::chrono::high_resolution_clock::now();
     TimePoint time_prev = time_start;
     int i;

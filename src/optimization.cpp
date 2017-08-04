@@ -102,11 +102,10 @@ Vector2 Gaze::operator () (Vector4 v) const
     return project(v, fn);
 }
 
-Face::Face(const Bitmap3 &ref, Region main_region, Circle left_eye, Circle right_eye):
+Face::Face(const Bitmap3 &ref, Region region, Circle left_eye, Circle right_eye):
     ref{ref.clone()},
-    main_tsf{main_region},
-    main_region{main_region},
-    children{this->ref, main_region},
+    main_tsf{region},
+    children{this->ref, region},
     eyes{left_eye, right_eye}
 {
 }
@@ -116,7 +115,7 @@ Transformation::Params update_step(const Transformation &tsf, const Bitmap3 &img
     Transformation::Params result;
     // formula : delta_tsf = -sum_pixel (img o tsf - ref)^t * gradient(img o tsf) * gradient(tsf)
     Transformation tsf_inv = tsf.inverse();
-    for (Pixel p : sampling(grad)) {
+    for (Pixel p : sampling(grad, tsf.region)) {
         Vector2 v = grad.to_world(p), refv = tsf_inv(v);
         if (ref.contains(refv)) {
             Vector3 diff = img(v) - ref(refv);
@@ -130,7 +129,7 @@ float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref
 {
     float result = 0;
     // formula : energy = 1/2 * sum_pixel (img o tsf - ref)^2
-    for (Pixel p : sampling(reference)) {
+    for (Pixel p : sampling(reference, tsf.region)) {
         Vector2 v = tsf(reference.to_world(p));
         Vector3 diff = img(v) - reference(p);
         result += diff.dot(diff);
@@ -142,11 +141,10 @@ float evaluate(const Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref
  * @param step Differential update of the transformation
  * @param r Region of interest (search domain for the maximum)
  */
-float step_length(Transformation::Params step, Region r, const Transformation &tsf)
+float step_length(Transformation::Params step, const Transformation &tsf)
 {
-    Vector2 points[] = {to_vector(r.tl()), Vector2(r.tl().x, r.br().y), to_vector(r.br()), Vector2(r.br().x, r.tl().y)};
     float result = 1e-5;
-    for (Vector2 v : points) {
+    for (Vector2 v : tsf.vertices()) {
         for (int i=0; i<2; i++) {
             result = std::max(result, std::abs(tsf.d(v, i).dot(step)));
         }
@@ -206,11 +204,10 @@ float line_search(Transformation::Params delta_tsf, float &max_length, float &pr
     }
 }
 
-void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img, const Bitmap3 &ref, int min_size)
+void refit_transformation(Transformation &tsf, const Bitmap3 &img, const Bitmap3 &ref, int min_size)
 {
     const int iteration_count = 2;
-    Region rotregion = tsf(region);
-    vector<std::pair<Bitmap3, Bitmap3>> pyramid{std::make_pair(img.crop(rotregion), ref.crop(region))};
+    vector<std::pair<Bitmap3, Bitmap3>> pyramid = {{img, ref}};
     if (std::min({pyramid.back().first.rows, pyramid.back().first.cols, pyramid.back().second.rows, pyramid.back().second.cols}) == 0) {
         return;
     }
@@ -228,7 +225,7 @@ void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img
 	        for (int iteration=0; iteration < iteration_count; ++iteration) {
 	            Transformation::Params delta_tsf = update_step(tsf, pair.first, dx, pair.second, 0) + update_step(tsf, pair.first, dy, pair.second, 1);
 	            if (iteration == 0) {
-	                max_length = (1 << pyramid.size()) / step_length(delta_tsf, rotregion, tsf);
+	                max_length = (1 << pyramid.size()) / step_length(delta_tsf, tsf);
 	            }
 	            float length = line_search(delta_tsf, max_length, prev_energy, tsf, pair.first, pair.second);
 	            if (length > 0) {
@@ -245,7 +242,7 @@ void refit_transformation(Transformation &tsf, Region region, const Bitmap3 &img
 void Face::refit(const Bitmap3 &img, bool only_eyes)
 {
     if (not only_eyes) {
-        refit_transformation(main_tsf, main_region, img, ref, 5);
+        refit_transformation(main_tsf, img, ref, 5);
         children.refit(img, main_tsf);
     }
     for (int i=0; i<2; ++i) {
@@ -300,7 +297,7 @@ Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye
     std::array<Circle, 2> eyes;
     for (int i=0; i<2; ++i) {
         Rect r = eye_rects[i];
-        eyes[i].center = image.to_world(parent.tl() + (r.tl() + r.br()) / 2);
+        eyes[i].center = image.to_world(parent.tl() + center(r));
         eyes[i].radius = 0.04 * scale;
     }
     ///@todo fixme init grid children if asked for it
