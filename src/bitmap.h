@@ -91,10 +91,14 @@ struct TriSampling
     struct Iterator : public Pixel {
         int vert_split;
         std::array<Pixel, 2> ends;
-        std::array<float, 4> slope;
+        std::array<Pixel, 2> mids;
         Iterator(Pixel top, Pixel mid, Pixel bottom): Pixel(top), ends{top, bottom}, vert_split(mid.y) {
-            std::tie(slope[0], slope[1]) = std::minmax(slope2(mid, top), slope2(bottom, top));
-            std::tie(slope[2], slope[3]) = std::minmax(slope2(bottom, top), slope2(bottom, mid));
+            mids[0] = mid;
+            float t = (bottom.y != top.y) ? float(mid.y - top.y) / (bottom.y - top.y) : 0;
+            mids[1] = Pixel(t * bottom.x + (1 - t) * top.x, mid.y);
+            if (mids[1].x < mids[0].x) {
+                std::swap(mids[0], mids[1]);
+            }
         }
         Iterator(int end): Pixel(0, end) {
         }
@@ -105,15 +109,21 @@ struct TriSampling
             return y != other.y;
         }
         Iterator& operator++() {
-            (++x > bound(true)) or (++y, x = bound(false));
+            (++x < bound(true)) or (++y, x = bound(false));
             return *this;
         }
         float slope2(Pixel a, Pixel b) {
             return float(b.x - a.x) / (b.y - a.y);
         }
         float bound(bool is_right) {
-            int i = (y >= vert_split);
-            return ends[i].x + (y - ends[i].y) * slope[2 * i + (is_right ? 1 : 0)];
+            const Pixel &mid = mids[is_right ? 1 : 0];
+            if (y < vert_split) {
+                float t = (ends[0].y != mid.y) ? float(y - ends[0].y) / (mid.y - ends[0].y) : 0;
+                return t * mid.x + (1 - t) * ends[0].x;
+            } else {
+                float t = (ends[1].y != mid.y) ? float(y - mid.y) / (ends[1].y - mid.y) : 0;
+                return t * ends[1].x + (1 - t) * mid.x;
+            }
         }
     };
     Iterator begin() const {
@@ -152,9 +162,15 @@ TriSampling sampling(const Bitmap<T> &img, const Triangle &r)
     Pixel top = img.to_clamped_local(r[0]);
     Pixel mid = img.to_clamped_local(r[1]);
     Pixel bottom = img.to_clamped_local(r[2]);
-    (bottom.y >= mid.y) or swap(bottom, mid);
-    (mid.y >= top.y) or swap(mid, top);
-    (bottom.y >= mid.y) or swap(bottom, mid);
+    if (bottom.y < mid.y) {
+        swap(bottom, mid);
+    }
+    if (mid.y < top.y) {
+        swap(mid, top);
+    }
+    if (bottom.y < mid.y) {
+        swap(bottom, mid);
+    }
     return TriSampling{top, mid, bottom};
 }
 
