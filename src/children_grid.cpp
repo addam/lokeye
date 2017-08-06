@@ -42,7 +42,7 @@ void Children::refit(const Bitmap3 &img, const Transformation &parent_tsf)
         pyramid.emplace_back(pair.first.downscale(), pair.second.downscale());
     }
     std::reverse(pyramid.begin(), pyramid.end());
-    const std::array<int, 4> centerpoint_index = {2, 1, 3, 0};
+    const std::array<int, 4> centerpoint_index = {2, 3, 1, 0};
     for (const auto &pair : pyramid) {
         Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
         vector<float> prev_energy;
