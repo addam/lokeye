@@ -36,5 +36,6 @@ protected:
     void update_params(Matrix33 in_params);  /// Precalculate the transformation derivatives
 };
 
+Vector2 extract_point(const Transformation&, unsigned);
 Vector2 extract_point(const Transformation::Params&, unsigned);
 #endif

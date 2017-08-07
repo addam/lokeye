@@ -46,12 +46,32 @@ inline Matrix23 dehomogenize(const Matrix33 &mat)
 	// TODO: assert something is unity?
 }
 
+Vector2 extract_point(const Transformation &tsf, unsigned index)
+{
+    assert (index < 3);
+    return vectorize(tsf.points.col(index));
+}
+
+Vector2 extract_point(const Params &p, unsigned index)
+{
+    assert (index < 3);
+    return vectorize(p.col(index));
+}
+
 Transformation::Transformation()
 {
 }
 
 Transformation::Transformation(Region in_region):
     region(triangle(in_region)),
+	points(to_matrix(region)),
+	static_params(homogenize(points).inv())
+{
+	update_params();
+}
+
+Transformation::Transformation(Triangle in_region):
+    region(in_region),
 	points(to_matrix(region)),
 	static_params(homogenize(points).inv())
 {
@@ -88,6 +108,13 @@ Transformation& Transformation::operator += (const Params &delta)
 {
 	points += delta;
 	update_params();
+    return *this;
+}
+
+Transformation& Transformation::increment(Vector2 delta, int index)
+{
+    add_col(points, index, delta);
+    update_params();
     return *this;
 }
 

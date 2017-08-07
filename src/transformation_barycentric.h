@@ -11,10 +11,12 @@ struct Transformation
     
     Transformation();
     Transformation(Region region);
+    Transformation(Triangle);
     Transformation(Triangle, decltype(params), decltype(static_params));
     Transformation& operator = (const Transformation&);
     Transformation operator + (const Params&) const;
     Transformation& operator += (const Params&);
+    Transformation& increment(Vector2, int);
     Vector2 operator () (Vector2) const;
     Vector2 operator () (Pixel p) const { return (*this)(to_vector(p)); }
     Region operator () (Region) const;
@@ -32,4 +34,6 @@ protected:
     void update_params(); /// recalculate params after a modification of points
 };
 
+Vector2 extract_point(const Transformation&, unsigned);
+Vector2 extract_point(const Transformation::Params&, unsigned);
 #endif

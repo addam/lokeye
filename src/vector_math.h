@@ -48,6 +48,14 @@ void set_col(cv::Matx<float, N, M> &matrix, int j, const Vector &vec)
 	}
 }
 
+template<int N, int M, typename Vector=cv::Matx<float, N, 1>>
+void add_col(cv::Matx<float, N, M> &matrix, int j, const Vector &vec)
+{
+	for (int i=0; i<N; ++i) {
+		matrix(i, j) += vec(i);
+	}
+}
+
 template<int N>
 cv::Vec<float, N> vectorize(cv::Matx<float, N, 1> m)
 {

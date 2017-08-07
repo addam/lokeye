@@ -1,7 +1,11 @@
-#include <opencv2/highgui.hpp>
 #include "children_grid.h"
 #include "optimization.h"
 
+#if defined TRANSFORMATION_PERSPECTIVE_H
+const std::array<int, 4> centerpoint_index = {2, 3, 1, 0};
+#elif defined TRANSFORMATION_BARYCENTRIC_H
+const std::array<int, 6> centerpoint_index = {0, 0, 0, 0, 0, 0};
+#endif
 
 Children::Children(const Bitmap3 &image, Region parent):
     ref(image),
@@ -18,11 +22,12 @@ Children::Children(const Bitmap3 &image, Region parent):
     }
 #elif defined TRANSFORMATION_BARYCENTRIC_H
     const float x = parent.x, y = parent.y, w = parent.width, h = parent.height;
-    vector<Vector2> v{Vector2(x+w/2, y+h/2), Vector2(x, y+h/2), Vector2(x+w/3, y), Vector2(x+2*w/3, y), Vector2(x+w, y+h/2), Vector2(x+2*w/3, y+h), Vector2(x+w/3, y+h)};
-    for (int i=2; i<v.size(); ++i) {
-        v[0], v[i-1], v[i];
-        TODO
-        children.emplace_back(r);
+    Vector2 center(x+w/2, y+h/2);
+    std::array<Vector2, 6> circle = {{{x, y+h/2}, {x+w/3, y}, {x+2*w/3, y}, {x+w, y+h/2}, {x+2*w/3, y+h}, {x+w/3, y+h}}};
+    Vector2 prev = circle.back();
+    for (Vector2 next : circle) {
+        children.emplace_back(Triangle{center, prev, next});
+        prev = next;
     }    
 #else
 #error "Grid is only supported with barycentric or perspective motion model."
@@ -42,7 +47,6 @@ void Children::refit(const Bitmap3 &img, const Transformation &parent_tsf)
         pyramid.emplace_back(pair.first.downscale(), pair.second.downscale());
     }
     std::reverse(pyramid.begin(), pyramid.end());
-    const std::array<int, 4> centerpoint_index = {2, 3, 1, 0};
     for (const auto &pair : pyramid) {
         Bitmap3 dx = pair.first.d(0), dy = pair.first.d(1);
         vector<float> prev_energy;
@@ -60,7 +64,7 @@ void Children::refit(const Bitmap3 &img, const Transformation &parent_tsf)
                 delta_center += length * extract_point(delta_tsf, centerpoint_index[i]);
             }
             for (int i=0; i<children.size(); ++i) {
-                children[i].increment(delta_center, centerpoint_index[i]);            
+                children[i].increment(delta_center, centerpoint_index[i]);
             }
         }
     }
@@ -68,6 +72,6 @@ void Children::refit(const Bitmap3 &img, const Transformation &parent_tsf)
 
 Vector2 Children::operator()(const Transformation &parent_tsf) const
 {
-    Vector2 center = children[0].points[2];
+    Vector2 center = extract_point(children.front(), centerpoint_index.front());
     return parent_tsf.inverse(center);
 }

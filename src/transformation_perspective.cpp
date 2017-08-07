@@ -80,6 +80,12 @@ array<Matrix33, 4> canonize_all_permutations(PointPack points)
 
 }
 
+Vector2 extract_point(const Transformation &tsf, unsigned index)
+{
+    assert (index < 4);
+    return points[index];
+}
+
 Vector2 extract_point(const Params &p, unsigned index)
 {
     assert (index < 4);
