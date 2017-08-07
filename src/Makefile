@@ -11,6 +11,7 @@ CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h -DCHL_HEADER=childre
 
 LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_objdetect
 OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDREN) eye.o
+ALL_OBJS = $(OBJS) children_grid.o children_markers.o
 BIN = fit_eyes
 
 all: $(BIN)
@@ -44,4 +45,4 @@ test_ceres optimization_ceres.o: CXXFLAGS += -I/usr/include/eigen3
 .PHONY: clean
 
 clean:
-	rm -f $(OBJS) $(BIN)
+	rm -f $(ALL_OBJS) $(BIN)
