@@ -10,13 +10,13 @@ OBJ_OPTIMIZATION = optimization.o
 CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h -DCHL_HEADER=children_$(CHILDREN).h
 
 LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_objdetect
-OBJS = ui.o bitmap.o main.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDREN) eye.o
+OBJS = ui.o bitmap.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDREN) eye.o
 ALL_OBJS = $(OBJS) children_grid.o children_markers.o
 BIN = fit_eyes
 
 all: $(BIN)
 
-$(BIN): $(OBJS)
+$(BIN): $(OBJS) main.o
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 test_bitmap: bitmap.o
@@ -29,7 +29,7 @@ test_transformation: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION) $(OBJ_CH
 test_transformation_barycentric: bitmap.o $(OBJ_TRANSFORMATION)
 test_optimization: bitmap.o $(OBJ_TRANSFORMATION) $(OBJ_OPTIMIZATION)
 cest_ceres: LIBS += -lceres -lglog
-test_%: test_%.cpp
+test_%: test_%.cpp $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 rig_eye: bitmap.o eye.o

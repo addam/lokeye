@@ -2,6 +2,7 @@
 #include "bitmap.h"
 #include "optimization.h"
 #include <iostream>
+#include <numeric>
 
 Matrix35 random_homography()
 {
@@ -45,31 +46,38 @@ vector<Measurement> generate_random(int count)
     return result;
 }
 
+void print(const vector<Measurement> &sample, const Gaze &fit)
+{
+    std::cout << "Fitted homography (input -> true output vs. fitted output):" << std::endl;
+    vector<float> errors;
+    for (Measurement m : sample) {
+        std::cout << "\t" << m.first << " -> " << m.second << " vs. " << fit(m.first) << std::endl;
+        errors.push_back(cv::norm(m.second - fit(m.first)));
+    }
+    std::cout << "\tAverage error: " << std::accumulate(errors.begin(), errors.end(), 0.f) / sample.size() << ", median: " << errors.at(errors.size() / 2) << std::endl;
+}
 int main(int argc, char** argv)
 {
     Matrix35 h = random_homography();
     h *= 1./cv::norm(h, cv::NORM_L1);
     std::cout << h << std::endl;
+    std::cout << "=  Fitting noisy point correspondences  =" << std::endl;
     for (int i=17; i < 20; ++i) {
+        std::cout << "== " << i << " points ==" << std::endl;
         vector<Measurement> sample = generate_correspondences(h, i);
         TimePoint time_start = std::chrono::high_resolution_clock::now();
         int support = 7;
-        Gaze fit(sample, support, 1);
+        Gaze fit = Gaze::ransac(sample, support, 1);
         float duration = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() - time_start).count();
-        fit.fn *= 1./cv::norm(fit.fn, cv::NORM_L1);
-        std::cout << fit.fn << std::endl;
-        for (Measurement m : sample) {
-            std::cout << m.first << " -> " << project(m.first, h) << " vs. " << fit(m.first) << std::endl;
-        }
-        //std::cout << "support " << support << ", " << duration << " seconds" << std::endl;
+        print(sample, fit);
     }
+    std::cout << "=== Fitting random data ===" << std::endl;
     for (int i=5; i<10; ++i) {
+        std::cout << "== " << i << " points ==" << std::endl;
         auto sample = generate_random((i == 9) ? 20 : i);
         int support = 5;
-        Gaze fit(sample, support, 0.1);
-        for (Measurement m : sample) {
-            std::cout << m.first << " -> " << m.second << " vs. " << fit(m.first) << std::endl;
-        }
+        Gaze fit = Gaze::ransac(sample, support, 0.1);
+        print(sample, fit);
     }
     return 0;
 }
