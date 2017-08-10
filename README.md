@@ -32,17 +32,17 @@ You can rejoice the results or press Escape to quit the program.
 
 ## configuration
 
-There are four 'motion models' available for face tracking.
+There are four ''motion models'' available for face tracking.
 At compile time, you have to set `TRANSFORMATION=<model>` to one of the following options:
  * `locrot`: Location and rotation. Very naive.
  * `affine`: Affine transformation. Flexible quite enough. Default option.
  * `barycentric`: Triangle-based affine transformation. Compared to the previous one, this is somewhat slower and allows you to use Grid Children.
- * `perspective`: Quadrangle-based homography. Most general transformation that makes sense. Same performance as the previous one, just a bit more buggy.
+ * `perspective`: Quadrangle-based homography. The most general transformation that still makes sense. Considerably slower than the others.
  
-There are two 'children schemes' for face tracking.
+There are two ''children schemes'' for face tracking.
 These are switched by the `CHILDREN=<scheme>` directive at compile time:
  * `markers`: Several small markers are set to track interesting facial features. Default option.
- * `grid`: The face area is seamlessly subdivided into several trackers, each responsible of its cut out cell. Only supported for `perspective` motion model so far. The code is unfinished and unstable.
+ * `grid`: The face area is seamlessly subdivided into several trackers, each responsible of its cut out cell.
 
 After changing these build options, it is necessary to do a `make clean`.
 
@@ -52,3 +52,31 @@ After changing these build options, it is necessary to do a `make clean`.
 Similar to the main program, this programs starts with either autodetection or interactive marking of the face.
 Then, it skips the calibration procedure and just shows the interactive face and eye tracking results.
 In this program, gaze is not estimated.
+
+### rig_eye
+Reads a CSV annotation file from standard input, reads the corresponding images from disk and refines the eye location in each of them.
+The input format is `filename,x,y,radius[,anything]`; the filename is directly copied to the output.
+The supplied coordinates are understood as ground truth, and each of the algorithms are executed several times from a random nearby location to find it.
+Each of these trials produces an output row `(space)algorithm,dx,dy`, where `dx` and `dy` are resulting coordinates relatively to the true center.
+All coordinates are expressed in pixel units, from top-left corner.
+
+### test_gaze
+Unit test for ransac-based homography fitting.
+The results have to be inspected by a human to check that they make sense.
+Firstly, a random homography and a set of noisy point correspondences are generated; these should have almost zero fitting error.
+Then, the program produces several completely random point sets.
+For seven points correspondences or less, the fit should be perfect; then, the average error is quite random.
+The median error should remain quite low as long as there are less than fifteen points.
+
+### test_transformation
+Unit test for analytical derivatives and other calculations related to the motion models.
+In the output, ''analytic derivative'' and ''analytic scale'' should be almost equal to their numeric counterparts.
+
+## tobii recording suite
+
+This program may be useful to many developers and scientists who use Tobii EyeX.
+It is a minimalistic application that lets you record the user (on video) and their gaze position, simultaneously.
+The output file format is CSV, each row corresponding to a frame of the video, and written down as `x,y` coordinates.
+
+The whole Visual C# 2015 project is located in the `screencapture` directory.
+The Tobii Framework is so far available only for Windows.
