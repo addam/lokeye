@@ -8,6 +8,8 @@
 #include "eye.h"
 
 using Measurement = std::pair<Vector4, Vector2>;
+const string face_classifier_xml = "/usr/share/opencv/haarcascades/haarcascade_frontalface_alt.xml";
+const string eye_classifier_xml = "/usr/share/opencv/haarcascades/haarcascade_eye_tree_eyeglasses.xml";
 
 class Gaze
 {
@@ -45,7 +47,7 @@ struct Face
 
 void refit_transformation(Transformation&, const Bitmap3&, const Bitmap3&, int min_size=3);
 Face init_interactive(const Bitmap3&);
-Face init_static(const Bitmap3&, const string &face_xml="/usr/local/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml", const string &eye_xml="/usr/local/share/OpenCV/haarcascades/haarcascade_eye_tree_eyeglasses.xml");
+Face init_static(const Bitmap3&, const string &face_xml=face_classifier_xml, const string &eye_xml=eye_classifier_xml);
 Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
 Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
 
