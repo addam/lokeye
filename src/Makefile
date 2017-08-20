@@ -11,7 +11,7 @@ CXXFLAGS += -DTSF_HEADER=transformation_$(TRANSFORMATION).h -DCHL_HEADER=childre
 
 LIBS = -lopencv_core -lopencv_video -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_objdetect
 OBJS = ui.o bitmap.o $(OBJ_OPTIMIZATION) $(OBJ_TRANSFORMATION) $(OBJ_CHILDREN) eye.o
-ALL_OBJS = $(OBJS) children_grid.o children_markers.o
+ALL_OBJS = $(OBJS) children_grid.o children_markers.o main.o
 BIN = fit_eyes
 
 all: $(BIN)
