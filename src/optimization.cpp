@@ -272,7 +272,7 @@ Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye
     cv::CascadeClassifier face_cl(face_xml);
     cv::CascadeClassifier eye_cl(eye_xml);
     if (face_cl.empty() or eye_cl.empty()) {
-		throw std::runtime_error("Face classification parameters could not be loaded. Check that the paths in optimization.h are correct.");
+		throw std::runtime_error("Face classification parameters could not be loaded. Check that the paths in system_paths.h are correct.");
 	}
     
     CharMat gray;

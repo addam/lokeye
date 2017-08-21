@@ -6,10 +6,9 @@
 #include STRINGIFY(CHL_HEADER)
 #include "bitmap.h"
 #include "eye.h"
+#include "system_paths.h"
 
 using Measurement = std::pair<Vector4, Vector2>;
-const string face_classifier_xml = "/usr/share/opencv/haarcascades/haarcascade_frontalface_alt.xml";
-const string eye_classifier_xml = "/usr/share/opencv/haarcascades/haarcascade_eye_tree_eyeglasses.xml";
 
 class Gaze
 {
