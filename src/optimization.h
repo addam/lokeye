@@ -48,7 +48,7 @@ void refit_transformation(Transformation&, const Bitmap3&, const Bitmap3&, int m
 Face init_interactive(const Bitmap3&);
 Face init_static(const Bitmap3&, const string &face_xml=face_classifier_xml, const string &eye_xml=eye_classifier_xml);
 Gaze calibrate_interactive(Face&, VideoCapture&, Pixel window_size=Pixel(1400, 700));
-Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&);
+Gaze calibrate_static(Face&, VideoCapture&, TrackingData::const_iterator&, int frame_step=1);
 
 float line_search(Transformation::Params, float &prev_energy, float max_length, const Transformation&, const Bitmap3&, const Bitmap3&);
 float step_length(Transformation::Params, const Transformation&);

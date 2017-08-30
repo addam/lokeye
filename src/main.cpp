@@ -52,7 +52,8 @@ TrackingData track_static(Face &state, VideoCapture &cam, Gaze &fit, TrackingDat
 	while (image.read(cam)) {
         state.refit(image);
         Vector2 pos = fit(state());
-		std::clog << "difference " << cv::norm(*(it++) - pos) << std::endl;
+		std::clog << "difference " << cv::norm(*it - pos) <<  ", estimated " << pos << ", truth " << *it << std::endl;
+		++it;
         result.push_back(pos);
 	}
 	return result;
@@ -110,6 +111,8 @@ int main(int argc, char** argv)
 {
 	string video_filename, csv_filename;
 	int camera_index = 0;
+	int frame_begin = 0, frame_step = 1;
+	std::vector<int> numeric_args;
 	bool is_interactive = false, is_verbose = false;
 	for (int i=1; i<argc; ++i) {
 		string arg(argv[i]);
@@ -121,7 +124,7 @@ int main(int argc, char** argv)
 			display_help();
 			return 0;
 		} else if (is_numeric(arg)) {
-			camera_index = std::stoi(arg);
+			numeric_args.push_back(std::stoi(arg));
 		} else if (video_filename.empty()) {
 			std::swap(video_filename, arg);
 		} else {
@@ -131,6 +134,18 @@ int main(int argc, char** argv)
 	if (not video_filename.empty() and csv_filename.empty()) {
 		csv_filename = replace_extension(video_filename, ".csv");
 	}
+	if (video_filename.empty()) {
+		if (numeric_args.size() >= 1) {
+			camera_index = numeric_args[0];
+		}
+	} else {
+		if (numeric_args.size() >= 1) {
+			frame_begin = numeric_args[0];
+		}
+		if (numeric_args.size() >= 2) {
+			frame_step = numeric_args[1];
+		}
+	}
 	
     VideoCapture cam = (video_filename.empty()) ? VideoCapture{camera_index} : VideoCapture{video_filename};
     Bitmap3 reference_image;
@@ -139,8 +154,12 @@ int main(int argc, char** argv)
 	        assert(reference_image.read(cam));
 	    }
 	} else {
-		assert(reference_image.read(cam));
-		cam = VideoCapture{video_filename};
+		for (int i = 0; i < frame_begin; ++i) {
+			assert(reference_image.read(cam));
+		}
+		if (frame_begin == 0) {
+			cam = VideoCapture{video_filename};
+		}
 	}
     try {
         Face state = (is_interactive) ? init_interactive(reference_image) : init_static(reference_image);
@@ -152,7 +171,7 @@ int main(int argc, char** argv)
             track_interactive(state, cam, fit, size);
         } else {
             TrackingData ground_truth = read_csv(csv_filename);
-            TrackingData::const_iterator it = ground_truth.begin();
+            TrackingData::const_iterator it = ground_truth.begin() + frame_begin;
             Gaze fit = calibrate_static(state, cam, it);
             TrackingData measurement = track_static(state, cam, fit, it);
             printf("average difference %g\n", average_difference(measurement, ground_truth));

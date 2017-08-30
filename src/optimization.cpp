@@ -304,17 +304,21 @@ Face init_static(const Bitmap3 &image, const string &face_xml, const string &eye
     return Face{image, to_region(parent), eyes[0], eyes[1]};
 }
 
-Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it)
+Gaze calibrate_static(Face &state, VideoCapture &cap, TrackingData::const_iterator &it, int frame_step)
 {
-    const int necessary_support = 80;
+    const int necessary_support = 18;
     vector<Measurement> measurements;
     while (1) {
 		for (int i = 0; i < necessary_support; ++i) {
 			Bitmap3 image;
-			image.read(cap);
+			const auto &truth = *it;
+			for (int i = 0; i < frame_step; ++i) {
+				image.read(cap);
+				++it;
+			}
 			state.refit(image);
 	        std::cout << " refitted " << state() << std::endl;
-			measurements.emplace_back(state(), *(it++));
+			measurements.emplace_back(state(), truth);
 		}
 		int support = necessary_support;
 		const float precision = 150;
